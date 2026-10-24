@@ -148,6 +148,7 @@ const EXTENDED_ASSESSMENTS: AssessmentRecord[] = [
 export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (page: string) => void; onNotify: (msg: string) => void }) {
   // Master assessment records
   const [records] = useState<AssessmentRecord[]>(EXTENDED_ASSESSMENTS)
+  const [now] = useState(() => Date.now())
 
   // Filter States
   const [dateRange, setDateRange] = useState<'All' | 'Today' | 'Last 7 Days' | 'Last 30 Days'>('Last 30 Days')
@@ -209,7 +210,6 @@ export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (pag
       // 1. Date filter
       if (appliedFilters.dateRange !== 'All') {
         const recordTime = new Date(r.timestamp).getTime()
-        const now = Date.now()
         if (appliedFilters.dateRange === 'Today') {
           if (recordTime < now - 86400000) return false
         } else if (appliedFilters.dateRange === 'Last 7 Days') {
@@ -231,7 +231,7 @@ export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (pag
 
       return true
     })
-  }, [records, appliedFilters])
+  }, [records, appliedFilters, now])
 
   /* ─── Computed Summary Cards ───────────────────────────────── */
   const stats = useMemo(() => {
@@ -358,7 +358,7 @@ export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (pag
               id="filter-period"
               className="filter-select-lg"
               value={dateRange}
-              onChange={e => setDateRange(e.target.value as any)}
+              onChange={e => setDateRange(e.target.value as 'All' | 'Today' | 'Last 7 Days' | 'Last 30 Days')}
             >
               <option value="All">All Time</option>
               <option value="Today">Today</option>
@@ -874,7 +874,7 @@ export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (pag
                   id="export-type-select"
                   className="filter-select-lg"
                   value={exportType}
-                  onChange={e => setExportType(e.target.value as any)}
+                  onChange={e => setExportType(e.target.value as 'Summary' | 'Overrides' | 'ModelEval')}
                 >
                   <option value="Summary">Assessment Summary Report</option>
                   <option value="Overrides">Clinical Review & Overrides Audit</option>
@@ -903,7 +903,7 @@ export default function ReportsPage({ onNavigate, onNotify }: { onNavigate: (pag
                   id="export-format-select"
                   className="filter-select-lg"
                   value={exportFormat}
-                  onChange={e => setExportFormat(e.target.value as any)}
+                  onChange={e => setExportFormat(e.target.value as 'PDF' | 'CSV')}
                 >
                   <option value="PDF">PDF Clinical Document (.pdf)</option>
                   <option value="CSV">Structured Data Extract (.csv)</option>

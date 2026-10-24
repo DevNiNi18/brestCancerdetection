@@ -10,6 +10,7 @@ export type ClinicianUser = {
   avatarColor: string
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEMO_CLINICIANS: ClinicianUser[] = [
   {
     name: 'Dr. Amina Bello',

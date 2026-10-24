@@ -14,6 +14,7 @@ export type Patient = {
   tone: string
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const patients: Patient[] = [
   { name: 'Fatima Garba', id: 'PT-2041', age: 52, date: 'Apr 28, 2025', status: 'Completed', result: 'Benign', probability: '8.2%', tone: 'coral' },
   { name: 'Chinedu Emeka Eze', id: 'PT-1987', age: 46, date: 'Apr 26, 2025', status: 'Completed', result: 'Benign', probability: '5.4%', tone: 'lilac' },

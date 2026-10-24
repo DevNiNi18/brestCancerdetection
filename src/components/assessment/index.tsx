@@ -860,7 +860,7 @@ export default function NewAssessment({ onNavigate, onNotify }: { onNavigate: (p
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => setCurrentStep((currentStep - 1) as any)}
+                  onClick={() => setCurrentStep((currentStep - 1) as 1 | 2 | 3)}
                 >
                   ← Back
                 </button>

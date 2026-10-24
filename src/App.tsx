@@ -68,12 +68,10 @@ function SideNavigation({
   onSelect,
   open,
   active,
-  onSignOut,
 }: {
   onSelect: (page: string) => void
   open: boolean
   active: string
-  onSignOut: () => void
 }) {
   return (
     <>
@@ -151,7 +149,6 @@ function App() {
           open={mobileOpen}
           active={activePage}
           onSelect={navigate}
-          onSignOut={handleSignOut}
         />
         <main>
           {activePage === 'Dashboard' && <DashboardHome onNavigate={navigate} />}

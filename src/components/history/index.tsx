@@ -31,6 +31,7 @@ export interface AssessmentRecord {
 }
 
 /* Mock clinical dataset for hospital CDS prototype */
+// eslint-disable-next-line react-refresh/only-export-components
 export const INITIAL_ASSESSMENTS: AssessmentRecord[] = [
   {
     id: 'ASM-2025-089',
@@ -256,6 +257,7 @@ export const INITIAL_ASSESSMENTS: AssessmentRecord[] = [
 export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate: (page: string) => void; onNotify: (msg: string) => void }) {
   // Assessment Records State
   const [records] = useState<AssessmentRecord[]>(INITIAL_ASSESSMENTS)
+  const [now] = useState(() => Date.now())
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('')
@@ -321,7 +323,6 @@ export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate
       // 5. Date Range Filter
       if (dateRangeFilter !== 'All') {
         const recordTime = new Date(record.timestamp).getTime()
-        const now = Date.now()
         if (dateRangeFilter === 'Today') {
           const oneDayAgo = now - 86400000
           if (recordTime < oneDayAgo) return false
@@ -336,7 +337,7 @@ export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate
 
       return true
     })
-  }, [records, searchQuery, classificationFilter, reviewStatusFilter, clinicianFilter, dateRangeFilter])
+  }, [records, now, searchQuery, classificationFilter, reviewStatusFilter, clinicianFilter, dateRangeFilter])
 
   /* ─── Sorting Logic ────────────────────────────────────────── */
   const sortedRecords = useMemo(() => {
@@ -464,7 +465,7 @@ export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate
             className="filter-select"
             value={classificationFilter}
             onChange={e => {
-              setClassificationFilter(e.target.value as any)
+              setClassificationFilter(e.target.value as 'All' | AssessmentRecord['aiClassification'])
               setCurrentPage(1)
             }}
             aria-label="Filter by AI classification"
@@ -480,7 +481,7 @@ export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate
             className="filter-select"
             value={reviewStatusFilter}
             onChange={e => {
-              setReviewStatusFilter(e.target.value as any)
+              setReviewStatusFilter(e.target.value as 'All' | AssessmentRecord['reviewStatus'])
               setCurrentPage(1)
             }}
             aria-label="Filter by review status"
@@ -512,7 +513,7 @@ export default function AssessmentHistory({ onNavigate, onNotify }: { onNavigate
             className="filter-select"
             value={dateRangeFilter}
             onChange={e => {
-              setDateRangeFilter(e.target.value as any)
+              setDateRangeFilter(e.target.value as 'All' | 'Today' | 'Last 7 Days' | 'Last 30 Days')
               setCurrentPage(1)
             }}
             aria-label="Filter by date range"

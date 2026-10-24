@@ -1,0 +1,806 @@
+/* ═══════════════════════════════════════════════════════════════
+   NEW ASSESSMENT UI — STYLING
+   ═══════════════════════════════════════════════════════════════ */
+
+.assessment-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ─── Breadcrumb & Draft Badge ─────────────────────────────── */
+.breadcrumb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.draft-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+.draft-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+/* ─── Stepper ──────────────────────────────────────────────── */
+.stepper-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 24px;
+  box-shadow: 0 4px 20px rgba(32, 58, 103, .04);
+}
+.stepper-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: all .18s ease;
+  font-family: inherit;
+  position: relative;
+  z-index: 2;
+}
+.step-item:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+.step-item:not(:disabled):hover {
+  background: #f8faff;
+}
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  background: #f1f5f9;
+  border: 2px solid transparent;
+  transition: all .2s ease;
+}
+.step-item.active .step-number {
+  background: #326FE1;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(50, 111, 225, .3);
+}
+.step-item.completed .step-number {
+  background: #159B91;
+  color: #fff;
+}
+.step-text {
+  text-align: left;
+}
+.step-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.step-title {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--navy);
+}
+.step-item.active .step-title {
+  color: #326FE1;
+}
+.step-divider {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 8px;
+  position: relative;
+}
+.step-divider.completed {
+  background: #159B91;
+}
+
+/* ─── Two-column Layout (Form + Summary Sidebar) ───────────── */
+.assessment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+/* ─── Main Form Card ───────────────────────────────────────── */
+.form-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(32, 58, 103, .05);
+  overflow: hidden;
+}
+.form-card-head {
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid #edf1f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.form-card-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.form-card-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.form-card-body {
+  padding: 26px;
+}
+
+/* ─── Field Groups & Form Elements ─────────────────────────── */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.form-full {
+  grid-column: 1 / -1;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.required-star {
+  color: #ef4444;
+  margin-left: 2px;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.input-text, .input-select, .input-textarea {
+  width: 100%;
+  border: 1px solid #dce5f1;
+  background: #fbfcff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: #1e293b;
+  font-family: inherit;
+  transition: all .15s ease;
+  box-sizing: border-box;
+}
+.input-text:focus, .input-select:focus, .input-textarea:focus {
+  outline: none;
+  border-color: #326FE1;
+  box-shadow: 0 0 0 3px rgba(50, 111, 225, .14);
+  background: #fff;
+}
+.input-error {
+  border-color: #ef4444 !important;
+  background: #fffafa !important;
+}
+.error-msg {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.input-textarea {
+  resize: vertical;
+  min-height: 85px;
+  line-height: 1.5;
+}
+
+/* ─── Patient Quick Search Helper ──────────────────────────── */
+.patient-search-box {
+  background: #f8faff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.search-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.search-box-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.search-helper-pill {
+  font-size: 11px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+.patient-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.patient-chip {
+  background: #fff;
+  border: 1px solid #dce5f1;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all .15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.patient-chip:hover {
+  border-color: #326FE1;
+  background: #eef4ff;
+  color: #1e40af;
+}
+
+/* ─── Measurement Tabs (Mean / SE / Worst) ─────────────────── */
+.measurement-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #edf1f7;
+  padding-bottom: 10px;
+}
+.m-tab-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-tab-btn.active {
+  background: #326FE1;
+  color: #fff;
+  border-color: #326FE1;
+  box-shadow: 0 4px 10px rgba(50, 111, 225, .25);
+}
+.m-count-badge {
+  background: rgba(0, 0, 0, .07);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.m-tab-btn.active .m-count-badge {
+  background: rgba(255, 255, 255, .25);
+  color: #fff;
+}
+
+/* ─── Measurement Input Cards ──────────────────────────────── */
+.measurement-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: all .15s ease;
+}
+.measurement-card:focus-within {
+  border-color: #326FE1;
+  box-shadow: 0 2px 10px rgba(50, 111, 225, .08);
+}
+.m-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.m-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.m-unit {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.m-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+.m-input:focus {
+  outline: none;
+  background: #fff;
+  border-color: #326FE1;
+}
+
+/* ─── Clinical Alert / Info Boxes ──────────────────────────── */
+.clinical-note-box {
+  background: #f0f7ff;
+  border: 1px solid #cfe2fe;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.clinical-note-icon {
+  color: #326FE1;
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.clinical-note-text {
+  font-size: 12.5px;
+  color: #1e3a8a;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── Form Action Buttons ──────────────────────────────────── */
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid #edf1f7;
+}
+.actions-left, .actions-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Review Step Styles ───────────────────────────────────── */
+.review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.review-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fafcff;
+}
+.review-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.review-edit-btn {
+  background: none;
+  border: none;
+  color: #326FE1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+.review-edit-btn:hover {
+  text-decoration: underline;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.review-stat {
+  font-size: 12px;
+}
+.review-stat-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.review-stat-value {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 13px;
+}
+
+/* Measurement Review Table */
+.measurement-review-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.measurement-review-table th {
+  background: #f1f5f9;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+.measurement-review-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+/* Confirmation Box */
+.confirmation-box {
+  background: #f8fafc;
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: all .15s ease;
+}
+.confirmation-box.checked {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.confirmation-box input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #159B91;
+  cursor: pointer;
+}
+.confirmation-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* ─── Right-Hand Sidebar Cards ─────────────────────────────── */
+.assessment-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.side-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 4px 20px rgba(32, 58, 103, .04);
+}
+.side-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--navy);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.side-card-title .status-badge {
+  font-size: 11px;
+}
+.side-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.side-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.side-stat-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.side-stat-label {
+  color: var(--muted);
+}
+.side-stat-val {
+  font-weight: 750;
+  color: var(--navy);
+  text-align: right;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Progress bar inside summary card */
+.measurement-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.measurement-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #326FE1, #159B91);
+  transition: width .3s ease;
+}
+
+/* Safeguard Card */
+.safeguard-card {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  padding: 18px;
+}
+.safeguard-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.safeguard-text {
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Before You Continue Card */
+.checklist-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px;
+}
+.checklist-header {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  margin-bottom: 10px;
+}
+.checklist-list {
+  padding-left: 18px;
+  margin: 0;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+/* ─── Submission State View ────────────────────────────────── */
+.submission-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 42px 32px;
+  text-align: center;
+  box-shadow: 0 12px 34px rgba(32, 58, 103, .06);
+  max-width: 720px;
+  margin: 20px auto;
+}
+.success-icon-wrap {
+  width: 64px;
+  height: 64px;
+  background: #e6f9f0;
+  color: #159B91;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  margin: 0 auto 18px;
+  box-shadow: 0 6px 16px rgba(21, 155, 145, .2);
+}
+.success-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 10px;
+}
+.success-desc {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.6;
+  max-width: 580px;
+  margin: 0 auto 24px;
+}
+.submission-meta-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+.submission-meta-item span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.submission-meta-item strong {
+  font-size: 14px;
+  color: var(--navy);
+}
+.prototype-notice-box {
+  background: #f0f7ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 12.5px;
+  color: #0369a1;
+  line-height: 1.5;
+  margin-bottom: 28px;
+  text-align: left;
+}
+.submission-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* ─── Modal Dialog (Clear Confirmation) ────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.modal-dialog {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 28px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, .2);
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 10px;
+}
+.modal-text {
+  font-size: 13.5px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 22px;
+}
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+/* ─── Responsive Adjustments ───────────────────────────────── */
+@media (max-width: 1120px) {
+  .assessment-layout {
+    grid-template-columns: 1fr;
+  }
+  .form-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .stepper-nav {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .step-divider {
+    display: none;
+  }
+  .form-grid-2, .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .form-card-body {
+    padding: 18px;
+  }
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .actions-left, .actions-right {
+    flex-direction: column;
+    width: 100%;
+  }
+  .actions-left button, .actions-right button {
+    width: 100%;
+  }
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+  .submission-meta-box {
+    grid-template-columns: 1fr;
+  }
+}

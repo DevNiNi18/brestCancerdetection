@@ -1,0 +1,271 @@
+/* ═══════════════════════════════════════════════════════════════
+   MEDLINK AUTHENTICATION PAGE
+   Pixel-matched to user specification
+   ═══════════════════════════════════════════════════════════════ */
+
+.medlink-auth-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  background-image: radial-gradient(at 0% 0%, rgba(61, 151, 162, 0.05) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(50, 111, 225, 0.04) 0px, transparent 50%);
+  padding: 30px 20px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1a202c;
+}
+
+.medlink-auth-card {
+  width: 100%;
+  max-width: 580px;
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.06), 0 2px 10px rgba(0, 0, 0, 0.02);
+  padding: 56px 64px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* ─── Header ───────────────────────────────────────────────── */
+.medlink-auth-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.medlink-auth-title {
+  font-size: 28px;
+  font-weight: 750;
+  color: #111827;
+  letter-spacing: -0.6px;
+  margin: 0 0 12px 0;
+}
+
+.medlink-auth-subtitle {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #64748b;
+  margin: 0 auto;
+  max-width: 440px;
+}
+
+/* ─── Form ─────────────────────────────────────────────────── */
+.medlink-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.medlink-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.medlink-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.medlink-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.medlink-input {
+  width: 100%;
+  padding: 15px 18px;
+  background-color: #f3f4f6;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #111827;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.medlink-input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.medlink-input:focus {
+  background-color: #ffffff;
+  border-color: #3d97a2;
+  box-shadow: 0 0 0 4px rgba(61, 151, 162, 0.12);
+}
+
+.medlink-eye-btn {
+  position: absolute;
+  right: 16px;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  transition: color 0.15s ease;
+}
+
+.medlink-eye-btn:hover {
+  color: #4b5563;
+}
+
+/* ─── Controls Row: Remember me + Forgot password ───────────── */
+.medlink-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+.medlink-remember-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.medlink-checkbox {
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  border: 1.5px solid #d1d5db;
+  cursor: pointer;
+  accent-color: #3d97a2;
+}
+
+.medlink-forgot-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #3d97a2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.medlink-forgot-link:hover {
+  color: #327e87;
+  text-decoration: underline;
+}
+
+/* ─── Login Button ─────────────────────────────────────────── */
+.medlink-login-btn {
+  width: 100%;
+  padding: 14px 24px;
+  background-color: #3d97a2;
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(61, 151, 162, 0.25);
+}
+
+.medlink-login-btn:hover {
+  background-color: #34848e;
+  box-shadow: 0 6px 18px rgba(61, 151, 162, 0.35);
+}
+
+.medlink-login-btn:active {
+  transform: scale(0.99);
+}
+
+.medlink-login-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+/* ─── Footer Text ──────────────────────────────────────────── */
+.medlink-auth-footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.medlink-register-link {
+  color: #3d97a2;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: 5px;
+}
+
+.medlink-register-link:hover {
+  color: #327e87;
+  text-decoration: underline;
+}
+
+/* ─── Demo Clinician Quick Helper (Discrete) ─────────────────── */
+.medlink-demo-hint {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.medlink-demo-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.medlink-demo-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.medlink-demo-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11.5px;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.medlink-demo-chip:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+/* ─── Responsive ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .medlink-auth-card {
+    padding: 36px 24px;
+    border-radius: 20px;
+  }
+  .medlink-auth-title {
+    font-size: 23px;
+  }
+}

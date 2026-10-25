@@ -1,0 +1,11 @@
+[server]
+address = "localhost"
+port = 3001
+
+[theme]
+base = "light"
+primaryColor = "#2e6de5"
+backgroundColor = "#f4f7fc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1e2d49"
+font = "sans serif"

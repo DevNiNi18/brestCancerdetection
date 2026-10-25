@@ -1,7 +1,3 @@
-[server]
-address = "localhost"
-port = 3001
-
 [theme]
 base = "light"
 primaryColor = "#2e6de5"

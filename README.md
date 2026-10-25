@@ -31,7 +31,7 @@ BreastCare AI is a Python and Streamlit prototype for entering the 30 numerical 
 - Provides **Use test input** to fill all 30 fields with randomized example values.
 - Provides **Clear inputs** to reset the current session.
 - Sends complete inputs to the locally saved Random Forest model and displays its predicted WDBC class and class scores.
-- Runs at `http://localhost:3001` by default.
+- Runs at `http://localhost:3001` with the command below. Streamlit hosting platforms choose their own listening port.
 
 The app does not include authentication, a patient directory, assessment history, or a database.
 
@@ -72,17 +72,17 @@ macOS/Linux:
 
 ```bash
 source .venv/bin/activate
-streamlit run app.py
+streamlit run app.py --server.port 3001
 ```
 
 Windows PowerShell:
 
 ```powershell
 .venv\Scripts\Activate.ps1
-streamlit run app.py
+streamlit run app.py --server.port 3001
 ```
 
-Open <http://localhost:3001>. The default host and port are set in [`.streamlit/config.toml`](.streamlit/config.toml). Stop the app with **Ctrl+C** in the terminal.
+Open <http://localhost:3001>. Stop the app with **Ctrl+C** in the terminal. The repository does not pin a server address or port in its Streamlit configuration, so hosted environments can use their assigned port.
 
 ### Create a new environment
 
@@ -158,7 +158,7 @@ The app expects the default model path and a compatible bundle schema. If you us
 | [`app.py`](app.py) | Streamlit interface, session-only form state, test input generation, input checks, and model inference. |
 | [`train_model.py`](train_model.py) | Random Forest training, holdout evaluation, and artifact generation. |
 | [`requirements.txt`](requirements.txt) | Streamlit and machine-learning dependencies. |
-| [`.streamlit/config.toml`](.streamlit/config.toml) | Binds Streamlit to `localhost:3001`. |
+| [`.streamlit/config.toml`](.streamlit/config.toml) | Sets the app's light theme; the host chooses the listening address and port. |
 | `models/breast_cancer_random_forest.joblib` | Model bundle loaded by the app. |
 | `models/breast_cancer_random_forest.metrics.json` | Detailed holdout metrics from the included training run. |
 
@@ -187,7 +187,7 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-You can also start Streamlit as a module with `python -m streamlit run app.py`.
+You can also start Streamlit as a module with `python -m streamlit run app.py --server.port 3001`.
 
 ### Port 3001 is already in use
 

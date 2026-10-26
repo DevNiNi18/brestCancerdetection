@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import random
+import json
 import math
 from pathlib import Path
 
@@ -41,6 +41,7 @@ GROUPS = [
 ]
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "breast_cancer_model.joblib"
+DEMO_CASES_PATH = Path(__file__).resolve().parent / "demo_cases.json"
 
 
 @st.cache_resource
@@ -58,12 +59,14 @@ def clear_inputs() -> None:
             st.session_state.pop(f"field_{input_key}", None)
             st.session_state.pop(input_key, None)
     st.session_state["active_group"] = "mean"
+    st.session_state.pop("active_demo_case", None)
 
 
 def persist_measurement(input_key: str, widget_key: str) -> None:
     values = dict(st.session_state.get("measurement_values", {}))
     values[input_key] = st.session_state.get(widget_key)
     st.session_state["measurement_values"] = values
+    st.session_state.pop("active_demo_case", None)
 
 
 def is_valid_measurement(value) -> bool:
@@ -75,22 +78,32 @@ def is_valid_measurement(value) -> bool:
 
 
 def load_demo_input() -> None:
-    if not demo_profiles:
+    if not demo_cases or model_bundle is None:
         return
-    previous_profile = st.session_state.get("last_demo_profile", "malignant")
-    profile_name = "malignant" if previous_profile == "benign" else "benign"
-    profile = demo_profiles[profile_name]
-    values = {}
-    for input_key, value in profile.items():
-        randomized_value = float(value) * random.uniform(0.99, 1.01)
-        limits = demo_ranges.get(input_key)
-        if limits:
-            randomized_value = min(max(randomized_value, limits["min"]), limits["max"])
-        values[input_key] = float(f"{randomized_value:.5g}")
-    st.session_state["last_demo_profile"] = profile_name
+    case_index = (st.session_state.get("last_demo_case_index", -1) + 1) % len(demo_cases)
+    case = demo_cases[case_index]
+    feature_to_key = dict(zip(model_bundle["input_features"], model_bundle["input_keys"]))
+    values = {
+        feature_to_key[feature_name]: float(value)
+        for feature_name, value in case["features"].items()
+    }
+    st.session_state["last_demo_case_index"] = case_index
+    st.session_state["active_demo_case"] = {
+        "number": case_index + 1,
+        "true_label": case["true_label"],
+    }
     st.session_state["measurement_values"] = values
     for input_key, value in values.items():
         st.session_state[f"field_{input_key}"] = value
+
+
+def load_demo_cases(path: Path) -> list:
+    """Load the held-out demonstration cases saved as JSON."""
+    with path.open(encoding="utf-8") as demo_file:
+        cases = json.load(demo_file)
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("The demo cases file must contain a non-empty JSON list.")
+    return cases
 
 st.set_page_config(page_title="Breast Cancer Prediction Prototype", page_icon="✚", layout="wide")
 
@@ -186,8 +199,17 @@ else:
     model_status = "● Train the model to begin"
     model_status_class = "missing"
 
-demo_profiles = model_bundle.get("demo_profiles", {}) if model_bundle is not None else {}
-demo_ranges = model_bundle.get("training_ranges", {}) if model_bundle is not None else {}
+demo_cases = []
+demo_cases_error = None
+try:
+    demo_cases = load_demo_cases(DEMO_CASES_PATH)
+    if model_bundle is not None:
+        expected_features = set(model_bundle.get("input_features", []))
+        for case in demo_cases:
+            if set(case.get("features", {})) != expected_features or case.get("true_label") not in model_bundle.get("target_names", []):
+                raise ValueError("A demo case does not match the loaded model's feature schema or class labels.")
+except (OSError, ValueError, json.JSONDecodeError) as error:
+    demo_cases_error = str(error)
 
 measurement_values = st.session_state["measurement_values"]
 filled_count = sum(1 for value in measurement_values.values() if value is not None)
@@ -218,12 +240,17 @@ with st.container(border=True):
         )
     with test_column:
         st.button(
-            "Fill with demo values",
-            help="Fill all fields with randomized values based on one of two training examples; these are not test cases.",
+            "Load held-out demo case",
+            help="Load the next saved case from the held-out test set. Its true label is shown after you request a prediction.",
             on_click=load_demo_input,
             use_container_width=True,
-            disabled=not demo_profiles,
+            disabled=not demo_cases or model_bundle is None,
         )
+        active_demo_case = st.session_state.get("active_demo_case")
+        if active_demo_case:
+            st.caption(f"Loaded held-out case {active_demo_case['number']} of {len(demo_cases)}")
+        elif demo_cases_error:
+            st.caption("Demo cases could not be loaded.")
 
     st.markdown('<hr class="card-divider">', unsafe_allow_html=True)
 
@@ -353,19 +380,28 @@ if prediction_clicked:
                 for label, score in zip(class_labels, scores)
             }
 
-            score_cards = "".join(
-                f'<div class="score-item"><div class="score-label">{str(class_names[label]).title()} class score</div>'
-                f'<div class="score-value">{score_by_name[str(class_names[label]).lower()]:.3%}</div></div>'
-                for label in class_labels
+            malignancy_probability = score_by_name["malignant"]
+            score_card = (
+                '<div class="score-item"><div class="score-label">Probability of malignancy</div>'
+                f'<div class="score-value">{malignancy_probability:.3%}</div></div>'
             )
             st.markdown(
                 f'<div class="result-panel"><h2 class="result-title">Model output</h2>'
                 f'<div class="result-class">Model classification: {class_names[predicted_label].title()}</div>'
-                f'<div class="score-row">{score_cards}</div>'
-                '<p class="result-footnote">Model-estimated probabilities are not calibrated estimates of individual risk. '
+                f'<div class="score-row">{score_card}</div>'
+                '<p class="result-footnote">This model-estimated probability is not a calibrated estimate of individual risk. '
                 'This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings.</p></div>',
                 unsafe_allow_html=True,
             )
+            active_demo_case = st.session_state.get("active_demo_case")
+            if active_demo_case:
+                actual_label = str(active_demo_case["true_label"]).title()
+                predicted_name = str(class_names[predicted_label]).title()
+                match_text = "The prediction matches the true label." if predicted_name.lower() == actual_label.lower() else "The prediction differs from the true label."
+                st.info(
+                    f"Held-out case {active_demo_case['number']} actual label: {actual_label}. "
+                    f"Model prediction: {predicted_name}. {match_text}"
+                )
             if out_of_range:
                 st.warning(
                     "One or more values are outside the training data ranges. The result may be unreliable. "

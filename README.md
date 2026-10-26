@@ -33,7 +33,7 @@ streamlit run app.py --server.port 3001
 Windows PowerShell:
 
 ```powershell
-py -3.13 -m venv .venv
+py -3.9 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
@@ -42,17 +42,17 @@ streamlit run app.py --server.port 3001
 
 Open <http://localhost:3001>. Stop the app with **Ctrl+C**. The Streamlit config sets the light theme but leaves the listening address and port to the host, so hosted environments can choose their own port.
 
-The project supports Python 3.9 through 3.13. `.python-version` selects Python 3.13 on platforms that use that file.
+The model artifacts were generated and the app was run with Python 3.9.6. `.python-version` selects Python 3.9.6 on platforms that use that file. The declared dependency ranges target Python 3.9 and newer.
 
 ## Using the interface
 
 1. Select **Mean**, **Standard error**, or **Worst**.
 2. Enter the 10 non-negative measurements for each section. Values are in dataset units; do not convert them.
 3. Complete all 30 fields and click **Get prediction**.
-4. Use **Fill with demo values** to alternate between randomized benign and malignant examples selected from the training split. They are not test cases.
+4. Use **Load held-out demo case** to fill the form with a saved test case. After you request a prediction, the app shows the case's true label for comparison.
 5. Click **Clear inputs** to reset the current session.
 
-The app displays the predicted dataset class and both class scores. The malignant score is a model-estimated probability and is not calibrated as an individual risk estimate. Values outside the training ranges produce a warning, but the app still returns the model output.
+The app displays the predicted dataset class and the **probability of malignancy**. This is a model-estimated probability, not a calibrated individual risk estimate. Values outside the training ranges produce a warning, but the app still returns the model output.
 
 Inputs live in the active Streamlit session only. The project has no accounts, database, assessment history, or application-level input saving. When hosted, inputs are sent to the server running Streamlit to perform inference; hosting and server logging are outside this repository's control.
 
@@ -110,7 +110,7 @@ Running `python train_model.py` creates or replaces:
 
 | Path | Contents |
 | --- | --- |
-| `models/breast_cancer_model.joblib` | Selected tuned pipeline, training-split demo profiles and ranges, feature names and input keys, positive-class label, and run metadata. |
+| `models/breast_cancer_model.joblib` | Selected tuned pipeline, training ranges, feature names and input keys, positive-class label, and run metadata. |
 | `models/model_evidence.json` | Every grid combination's CV scores, best parameters, selection decision, test metrics for all three models, confusion matrices, and library versions. |
 | `models/data_quality_report.json` | Pre-split dataset quality audit, class counts, and per-feature ranges. |
 | `models/roc_curves.png` | Held-out ROC curves for all three models. |
@@ -120,10 +120,10 @@ Running `python train_model.py` creates or replaces:
 | `demo_cases.json` | Six held-out rows: three benign and three malignant, with measurements, true labels, and selected-model predictions and scores. |
 | `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
 
-`training_data.json` contains the 455 records used for cross-validation, model selection, and fitting. `testing_data.json` contains the 114 held-out records used for the one-time evaluation. `demo_cases.json` is a six-record sample taken from the test set; it is not the full test set. The split metadata and original dataset row index are included so records can be traced to the source dataset.
+`training_data.json` contains the 455 records used for cross-validation, model selection, and fitting. `testing_data.json` contains the 114 held-out records used for the one-time evaluation. `demo_cases.json` is a six-record sample taken from the test set; it is not the full test set. The app's **Load held-out demo case** button cycles through these six cases, fills in their measurements, and reveals each true label after prediction so it can be compared with the model output. The split metadata and original dataset row index are included so records can be traced to the source dataset.
 
 
-The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. Demo profiles are chosen from the training split, not the held-out test set. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
+The application loads `models/breast_cancer_model.joblib` for predictions and `demo_cases.json` for held-out examples. It validates the model and demo case schemas and never retrains. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
 
 ## Project files
 
@@ -147,4 +147,4 @@ The application only loads `models/breast_cancer_model.joblib`. It validates the
 - The bundled dataset is small and cannot establish clinical validity or population-level reliability.
 - Model probabilities are not calibrated patient-risk estimates.
 - The interface does not provide diagnosis, treatment advice, patient accounts, storage, or history.
-- Demo values alternate between small randomized perturbations of one benign and one malignant training-split example. They are not the held-out demo cases or clinical cases.
+- The six held-out demo cases are examples for demonstrating model predictions; they are not clinical cases.

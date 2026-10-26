@@ -1323,8 +1323,7 @@
     "roc_curves": "models/roc_curves.png",
     "confusion_matrices": "models/confusion_matrices.png"
   },
-  "demo_cases": "demo_cases.csv",
-  "demo_profiles_source": "One confidently classified benign and one confidently classified malignant row, selected from the training split only.",
+  "demo_cases": "demo_cases.json",
   "library_versions": {
     "python": "3.9.6",
     "scikit_learn": "1.6.1",
@@ -1334,5 +1333,7 @@
     "joblib": "1.5.3",
     "matplotlib": "3.9.4"
   },
-  "warning": "Educational prototype results on a small public dataset do not establish clinical performance."
+  "warning": "Educational prototype results on a small public dataset do not establish clinical performance.",
+  "training_data": "training_data.json",
+  "testing_data": "testing_data.json"
 }

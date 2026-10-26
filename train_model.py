@@ -376,28 +376,6 @@ def main() -> None:
         for column, key in enumerate(input_keys)
     }
     selected_model = selected_search.best_estimator_
-    training_malignant_index = [int(label) for label in selected_model.classes_].index(malignant_label)
-    training_malignant_scores = selected_model.predict_proba(X_train)[:, training_malignant_index]
-    benign_training_rows = np.flatnonzero(y_train == benign_label)
-    malignant_training_rows = np.flatnonzero(y_train == malignant_label)
-    # Choose examples with confident but non-saturated class scores, so the
-    # demo shows both outcomes without displaying 0%/100% every time.
-    benign_profile_row = benign_training_rows[
-        np.argmin(np.abs(training_malignant_scores[benign_training_rows] - 0.10))
-    ]
-    malignant_profile_row = malignant_training_rows[
-        np.argmin(np.abs(training_malignant_scores[malignant_training_rows] - 0.90))
-    ]
-    demo_profiles = {
-        "benign": {
-            key: float(X_train[benign_profile_row, column])
-            for column, key in enumerate(input_keys)
-        },
-        "malignant": {
-            key: float(X_train[malignant_profile_row, column])
-            for column, key in enumerate(input_keys)
-        },
-    }
     selected_bundle = {
         "model": selected_model,
         "model_name": selected_name,
@@ -407,7 +385,6 @@ def main() -> None:
         "positive_class": "malignant",
         "positive_class_label": malignant_label,
         "training_ranges": train_ranges,
-        "demo_profiles": demo_profiles,
         "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
         "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
         "best_parameters": selected_search.best_params_,
@@ -447,7 +424,7 @@ def main() -> None:
         "demo_cases": str(DEMO_PATH),
         "training_data": str(TRAINING_DATA_PATH),
         "testing_data": str(TESTING_DATA_PATH),
-        "demo_profiles_source": "One confidently classified benign and one confidently classified malignant row, selected from the training split only.",
+        "demo_cases": str(DEMO_PATH),
         "library_versions": {
             "python": platform.python_version(),
             "scikit_learn": sklearn.__version__,

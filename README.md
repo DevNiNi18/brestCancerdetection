@@ -113,7 +113,6 @@ Running `python train_model.py` creates or replaces:
 | `demo_cases.csv` | Six held-out rows: three benign and three malignant, all 30 measurements, true label, and selected-model prediction and score for comparison. |
 | `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
 
-UI captures are in [`screenshots/`](screenshots/): the blank form, disabled submit state, range warning, benign and malignant outputs, and the diagnostic notice.
 
 The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
 

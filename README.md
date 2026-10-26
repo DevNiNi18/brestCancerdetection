@@ -5,25 +5,25 @@ subtitle: "Project Guide"
 
 # Breast Cancer Prediction Prototype
 
-A Python and Streamlit learning prototype for entering the 30 measurements from the Wisconsin Diagnostic Breast Cancer (WDBC) dataset and viewing a model prediction. The training script compares exactly three classifiers: Logistic Regression, SVM, and Random Forest. It selects one using cross-validation only; the app loads that saved model and never trains during a prediction.
+This is a learning project built with Python and Streamlit. It uses 30 cell nucleus measurements from the Wisconsin Diagnostic Breast Cancer (WDBC) dataset to predict whether a record is labeled **benign** or **malignant**.
 
-> **Clinical limitation:** This is an educational demonstration, not a diagnostic tool or medical device. The dataset and evaluation do not establish clinical performance. This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings.
+> **Important:** This is a classroom demonstration, not a diagnostic tool. Its predictions are not medical advice or calibrated estimates of a person's cancer risk.
 
-## Clone and run
+## Run the app
 
-Clone the GitHub repository and enter its directory:
+If you have not downloaded the project yet, clone the repository and enter its folder:
 
 ```bash
 git clone https://github.com/OtieteAyebanua/brestCancerdetection.git
 cd brestCancerdetection
 ```
 
-Create a Python environment, install the dependencies, and start the app:
+The project was run with Python 3.9.6. Install that version, then from the project folder create an environment and install the required packages.
 
 macOS/Linux:
 
 ```bash
-python3 -m venv .venv
+python3.9 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
@@ -40,111 +40,102 @@ python -m pip install -r requirements.txt
 streamlit run app.py --server.port 3001
 ```
 
-Open <http://localhost:3001>. Stop the app with **Ctrl+C**. The Streamlit config sets the light theme but leaves the listening address and port to the host, so hosted environments can choose their own port.
+Open <http://localhost:3001>. Stop the app with **Ctrl+C**. Once the environment is set up, you can also start the app from the project folder with `./run` on macOS/Linux.
 
-The model artifacts were generated and the app was run with Python 3.9.6. `.python-version` selects Python 3.9.6 on platforms that use that file. The declared dependency ranges target Python 3.9 and newer.
+## Using the app
 
-## Using the interface
+The app collects 30 measurements in three sections: **Mean**, **Standard error**, and **Worst**. Each section has 10 measurements. Enter all 30 values and choose **Get prediction**. The app displays its predicted class and the **probability of malignancy** estimated by the model. The probability is not calibrated as an individual risk estimate.
 
-1. Select **Mean**, **Standard error**, or **Worst**.
-2. Enter the 10 non-negative measurements for each section. Values are in dataset units; do not convert them.
-3. Complete all 30 fields and click **Get prediction**.
-4. Use **Load held-out demo case** to fill the form with a saved test case. After you request a prediction, the app shows the case's true label for comparison.
-5. Click **Clear inputs** to reset the current session.
+Choose **Load held-out demo case** to fill the form with one of six saved test examples. The app cycles through the examples. After you request a prediction, it displays the example's actual label beside the model's prediction. These examples are for demonstrating the app; they are not new clinical cases.
 
-The app displays the predicted dataset class and the **probability of malignancy**. This is a model-estimated probability, not a calibrated individual risk estimate. Values outside the training ranges produce a warning, but the app still returns the model output.
+If a value is outside the range seen during training, the app warns that the prediction may be unreliable and still shows the model output. Use **Clear inputs** to reset the form. Input values stay in the active Streamlit session; this project does not include accounts, a database, or prediction history.
 
-Inputs live in the active Streamlit session only. The project has no accounts, database, assessment history, or application-level input saving. When hosted, inputs are sent to the server running Streamlit to perform inference; hosting and server logging are outside this repository's control.
+## How the project works
 
-## Model training and selection
+1. `train_model.py` loads the WDBC dataset bundled with scikit-learn and splits its 569 records into training and test sets.
+2. It tunes three classifiers—Logistic Regression, Support Vector Machine (SVM), and Random Forest—using cross-validation on the training set.
+3. It selects one model using the cross-validation results, then evaluates all three models on the held-out test set.
+4. It saves the selected model and supporting reports and data files.
+5. `app.py` loads the saved model and uses it to make predictions. The app does not train a model when someone enters measurements.
 
-The training script uses scikit-learn's bundled WDBC data (569 rows, 30 features). No separate training-data download is required. It saves the deterministic training and test sets separately as `training_data.json` and `testing_data.json`; both files contain JSON records with a `source_index`, a `features` object, and a `target` label. The split uses seed 42 and preserves the class proportions. To rebuild all artifacts:
+![Diagram showing the WDBC dataset split into training and test sets, model comparison, test evaluation, and the saved model being used by the app.](project_workflow.png)
+
+*Figure 1. Project workflow. The held-out test set is used for evaluation after cross-validation model selection is complete.*
+
+The split is stratified, meaning the training and test sets preserve approximately the same benign/malignant proportions as the full dataset. It uses random seed 42 so the split can be reproduced. The training file has 455 records; the test file has 114.
+
+### Model selection and results
+
+The script uses five-fold stratified cross-validation on the training set. It selects among models whose mean cross-validation ROC-AUC is within 0.01 of the best, preferring higher malignant recall, then higher F1, then the simpler model according to a fixed order. It does not use the test set to tune or select a model.
+
+The saved run selected **Logistic Regression**. These are the reported results from the one held-out split:
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Logistic Regression | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9954 |
+| SVM | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9977 |
+| Random Forest | 0.9561 | 0.9512 | 0.9286 | 0.9398 | 0.9927 |
+
+These scores describe one split of a small public dataset. They do not establish clinical performance or performance on other populations or hospitals.
+
+## Concepts to explain in your presentation
+
+**Features and labels:** The 30 measurements are the model's features, or inputs. The dataset's `benign` or `malignant` value is the label the model learns to predict.
+
+**Training and test data:** The training data is used to tune and fit models. The separate test data is held back until the models have been compared, so it can show how they perform on records that were not used for that selection. Here, the split is 455 training records and 114 test records.
+
+**Cross-validation:** The training data is divided into five parts. The model is trained on four parts and checked on the fifth, rotating which part is held out. This gives a more stable basis for comparing model settings than one training/validation split. The test data is not part of cross-validation.
+
+**The three models:** Logistic Regression finds a weighted boundary between the two classes. SVM (Support Vector Machine) finds a boundary that separates the classes, and can model curved boundaries. Random Forest combines the votes of many decision trees. These are three different ways to learn patterns from the same measurements.
+
+**How the model was chosen:** The script first considers cross-validation ROC-AUC. It keeps models whose score is within 0.01 of the best, then favors higher malignant recall, higher F1, and finally a fixed model order. This is why the saved run chose Logistic Regression even though SVM had a slightly higher mean cross-validation ROC-AUC.
+
+**What the evaluation metrics mean:** Accuracy is the share of all records classified correctly. Precision answers: of the records predicted malignant, how many were actually malignant? Recall answers: of the records that were actually malignant, how many did the model find? F1 combines precision and recall into one score. ROC-AUC summarizes how well the model ranks malignant records above benign ones across different decision thresholds.
+
+**Probability of malignancy:** This is the model's estimated probability that an input belongs to the dataset's malignant class. It is not calibrated as a person's medical risk and must not be used as a diagnosis.
+
+**A short explanation you can say:**
+
+> “We used 30 measurements from the Wisconsin Diagnostic Breast Cancer dataset. We split the records into training and test data. We used five-fold cross-validation on the training data to compare Logistic Regression, SVM, and Random Forest, then evaluated the selected model on the held-out test data. The app loads the saved Logistic Regression model and displays its classification and estimated probability of malignancy. This is a learning prototype, not a clinical diagnostic tool.”
+
+## Data files
+
+The dataset is included with scikit-learn, so no separate download is needed. Each record has 30 numeric features and a target label (`malignant` or `benign`).
+
+- [`training_data.json`](training_data.json) contains the 455 records used for cross-validation, model selection, and fitting.
+- [`testing_data.json`](testing_data.json) contains the 114 records held out for evaluation.
+- [`demo_cases.json`](demo_cases.json) contains six examples sampled from the test set: three benign and three malignant. Each record includes the measurements, actual label, saved model prediction, and malignant probability.
+
+The training and test JSON records include a `source_index`, a `features` object, and a `target` label. `demo_cases.json` is only a small example set; it is not the full test set. The model's reported test metrics were computed on all 114 test records.
+
+## Project files
+
+| File or folder | What it does |
+| --- | --- |
+| [`app.py`](app.py) | Runs the Streamlit interface, validates inputs, loads the saved model, and displays predictions. It also loads the held-out examples from `demo_cases.json`. |
+| [`train_model.py`](train_model.py) | Splits the data, tunes and compares the three classifiers, evaluates them, and writes model, data, and report files. |
+| [`requirements.txt`](requirements.txt) | Lists the Python packages needed by the project. |
+| [`.python-version`](.python-version) | Selects Python 3.9.6 for tools that recognize this file. |
+| [`run`](run) | Convenience launcher for macOS/Linux after Python and dependencies are set up. |
+| [`project_workflow.png`](project_workflow.png) and [`project_workflow.svg`](project_workflow.svg) | Workflow diagram embedded in this guide and its scalable vector version. |
+| [`models/breast_cancer_model.joblib`](models/breast_cancer_model.joblib) | The selected model loaded by the app. |
+| [`models/model_evidence.json`](models/model_evidence.json) | Cross-validation, selection, and test evaluation details. |
+| [`models/data_quality_report.json`](models/data_quality_report.json) | Dataset checks and feature summaries. |
+| `models/roc_curves.png`, `models/confusion_matrices.png` | Comparison plots created when you run `train_model.py`. |
+| [`models/pip-freeze.txt`](models/pip-freeze.txt) | Package versions recorded for the model-generation environment. |
+
+To regenerate the model and reports, activate the project environment and run:
 
 ```bash
 python train_model.py
 ```
 
-### Dataset quality inspection
-
-Before splitting the data, the script records the source, row and feature counts, numeric types, missing and infinite values, duplicate feature rows, constant features, class distribution, and minimum/maximum and unique-value count for every feature. The bundled dataset currently has 569 rows and 30 numeric features, with no missing values, infinite values, duplicate feature rows, or constant features. It contains 212 malignant cases (37.26%) and 357 benign cases (62.74%). The stratified split preserves this class distribution in the train and test subsets. See [`models/data_quality_report.json`](models/data_quality_report.json) for the full per-feature ranges and audit details.
-
-The procedure is fixed:
-
-1. Make one stratified 80/20 train/test split with seed 42.
-2. Run five-fold stratified cross-validation with shuffle and seed 42 on the training split only. Scaling is fitted inside each fold for Logistic Regression and SVM; Random Forest uses raw values.
-3. Grid-search ROC-AUC, malignant recall, malignant precision, F1, and accuracy, refitting each model on ROC-AUC.
-4. Select among models whose mean CV ROC-AUC is within 0.01 of the best. Choose the highest malignant recall, breaking ties by F1 and then simplicity: Logistic Regression, SVM, Random Forest.
-5. Evaluate all three tuned models on the held-out test split once, after selection. Save the selected tuned estimator exactly as evaluated, fitted on the training split only.
-
-No class weighting is used. The requested parameter grids are run in full.
-
-### Best cross-validation results
-
-Metrics are means across the five training folds. Recall, precision, F1, and ROC-AUC treat malignant as the positive class.
-
-| Model | Best parameters | ROC-AUC | Recall | Precision | F1 | Accuracy |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Logistic Regression | `C=1` | 0.9959 | 0.9647 | 0.9770 | 0.9703 | 0.9780 |
-| SVM | `kernel=rbf, C=10, gamma=0.01` | 0.9964 | 0.9529 | 0.9820 | 0.9668 | 0.9758 |
-| Random Forest | `n_estimators=300, max_depth=5, min_samples_split=2` | 0.9909 | 0.9412 | 0.9490 | 0.9442 | 0.9582 |
-
-**Selected model: Logistic Regression.** All three models fall within 0.01 of the highest mean CV ROC-AUC. Logistic Regression has the highest mean malignant recall among them.
-
-### One-time held-out test results
-
-The test split contains 114 cases (42 malignant, 72 benign). It was not used for tuning or model selection.
-
-| Model | Accuracy | Precision | Recall | F1 | ROC-AUC | Confusion matrix¹ |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| Logistic Regression | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9954 | `[[41, 1], [1, 71]]` |
-| SVM | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9977 | `[[41, 1], [1, 71]]` |
-| Random Forest | 0.9561 | 0.9512 | 0.9286 | 0.9398 | 0.9927 | `[[39, 3], [2, 70]]` |
-
-¹ Rows are actual and columns predicted, ordered malignant then benign.
-
-These are results for a single split of a small public benchmark dataset. They are not external validation, clinical validation, or evidence of performance on new hospitals, populations, or workflows.
-
-## Generated artifacts
-
-Running `python train_model.py` creates or replaces:
-
-| Path | Contents |
-| --- | --- |
-| `models/breast_cancer_model.joblib` | Selected tuned pipeline, training ranges, feature names and input keys, positive-class label, and run metadata. |
-| `models/model_evidence.json` | Every grid combination's CV scores, best parameters, selection decision, test metrics for all three models, confusion matrices, and library versions. |
-| `models/data_quality_report.json` | Pre-split dataset quality audit, class counts, and per-feature ranges. |
-| `models/roc_curves.png` | Held-out ROC curves for all three models. |
-| `models/confusion_matrices.png` | Held-out confusion matrices for all three models. |
-| `training_data.json` | All 455 stratified training records, with 30 measurements, labels, and source row indices. |
-| `testing_data.json` | All 114 held-out test records, with 30 measurements, labels, and source row indices. |
-| `demo_cases.json` | Six held-out rows: three benign and three malignant, with measurements, true labels, and selected-model predictions and scores. |
-| `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
-
-`training_data.json` contains the 455 records used for cross-validation, model selection, and fitting. `testing_data.json` contains the 114 held-out records used for the one-time evaluation. `demo_cases.json` is a six-record sample taken from the test set; it is not the full test set. The app's **Load held-out demo case** button cycles through these six cases, fills in their measurements, and reveals each true label after prediction so it can be compared with the model output. The split metadata and original dataset row index are included so records can be traced to the source dataset.
-
-
-The application loads `models/breast_cancer_model.joblib` for predictions and `demo_cases.json` for held-out examples. It validates the model and demo case schemas and never retrains. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
-
-## Project files
-
-| Path | Purpose |
-| --- | --- |
-| `app.py` | Streamlit input form, session-only input state, schema/range checks, and inference. |
-| `train_model.py` | Fixed three-model grid search, cross-validation selection, holdout evaluation, plots, evidence, and demo-case export. |
-| `run` | Starts the Streamlit app on port 3001 using the project virtual environment. |
-| `requirements.txt` | Python app and training dependencies. |
-| `.python-version` | Preferred Python version for compatible hosting platforms. |
-| `.streamlit/config.toml` | Light theme configuration; no fixed server port. |
-| `training_data.json` | Full training split as labeled JSON records. |
-| `testing_data.json` | Full held-out test split as labeled JSON records. |
-| `demo_cases.json` | Six labeled cases from the held-out test split. |
-| `models/` | Selected model, evidence JSON, and evaluation plots. |
-| `models/pip-freeze.txt` | Local environment's `pip freeze` output. |
+This rebuilds the training and test JSON files, six demo cases, selected model, evidence report, data quality report, and comparison plots. The app needs the saved model file to make predictions and `demo_cases.json` to load the demo examples.
 
 ## Limitations
 
-- This is a classroom prototype, not a clinical tool.
-- The bundled dataset is small and cannot establish clinical validity or population-level reliability.
-- Model probabilities are not calibrated patient-risk estimates.
-- The interface does not provide diagnosis, treatment advice, patient accounts, storage, or history.
-- The six held-out demo cases are examples for demonstrating model predictions; they are not clinical cases.
+- This project is for learning and demonstration, not clinical use.
+- The dataset is a small public benchmark and cannot establish clinical validity.
+- The probability shown by the app is a model output, not a calibrated patient risk estimate.
+- The six demo cases come from the held-out test set and are examples for demonstrating predictions, not a new independent evaluation.
+- The app has no patient accounts, database, or prediction history.

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Always run from the project directory, even if this script is called elsewhere.
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR"
+
+if [[ ! -d .venv ]]; then
+    python3 -m venv .venv
+fi
+
+PYTHON=".venv/bin/python"
+if [[ ! -x "$PYTHON" ]]; then
+    echo "Could not find Python in .venv. Remove .venv and run ./run again." >&2
+    exit 1
+fi
+
+if ! "$PYTHON" -c 'import streamlit' >/dev/null 2>&1; then
+    "$PYTHON" -m pip install -r requirements.txt
+fi
+
+exec "$PYTHON" -m streamlit run app.py --server.port 3001

@@ -7,7 +7,6 @@ it again on the held-out records or the full dataset.
 
 from __future__ import annotations
 
-import csv
 import json
 import platform
 from importlib.metadata import version
@@ -49,7 +48,9 @@ EVIDENCE_PATH = OUTPUT_DIR / "model_evidence.json"
 QUALITY_PATH = OUTPUT_DIR / "data_quality_report.json"
 ROC_PLOT_PATH = OUTPUT_DIR / "roc_curves.png"
 CONFUSION_PLOT_PATH = OUTPUT_DIR / "confusion_matrices.png"
-DEMO_PATH = Path("demo_cases.csv")
+TRAINING_DATA_PATH = Path("training_data.json")
+TESTING_DATA_PATH = Path("testing_data.json")
+DEMO_PATH = Path("demo_cases.json")
 
 MODEL_ORDER = {"Logistic Regression": 0, "SVM": 1, "Random Forest": 2}
 
@@ -219,6 +220,32 @@ def save_comparison_plots(evaluations: dict) -> None:
     plt.close(fig)
 
 
+def write_dataset_files(dataset, train_indices, test_indices) -> None:
+    """Save the deterministic training and test sets as separate JSON files."""
+    def records(indices):
+        return [
+            {
+                "source_index": int(index),
+                "features": {
+                    str(name): float(value)
+                    for name, value in zip(dataset.feature_names, dataset.data[index])
+                },
+                "target": str(dataset.target_names[dataset.target[index]]),
+            }
+            for index in indices
+        ]
+
+    metadata = {
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+        "target_names": [str(name) for name in dataset.target_names],
+        "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
+    }
+    training = {**metadata, "set": "training", "records": records(train_indices)}
+    testing = {**metadata, "set": "testing", "records": records(test_indices)}
+    TRAINING_DATA_PATH.write_text(json.dumps(training, indent=2) + "\n", encoding="utf-8")
+    TESTING_DATA_PATH.write_text(json.dumps(testing, indent=2) + "\n", encoding="utf-8")
+
+
 def write_demo_cases(dataset, X_test, y_test, malignant_label, benign_label, selected_estimator) -> None:
     rows = []
     for label in (benign_label, malignant_label):
@@ -227,26 +254,20 @@ def write_demo_cases(dataset, X_test, y_test, malignant_label, benign_label, sel
             rows.append((X_test[row_index], int(label)))
     if len(rows) != 6:
         raise RuntimeError("The held-out test set must contain at least three examples of each class.")
-    with DEMO_PATH.open("w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow([
-            *dataset.feature_names,
-            "true_label",
-            "selected_model_prediction",
-            "selected_model_malignant_probability",
-        ])
-        for values, label in rows:
-            row_prediction = int(selected_estimator.predict([values])[0])
-            classes = [int(class_label) for class_label in selected_estimator.classes_]
-            malignant_probability = float(
-                selected_estimator.predict_proba([values])[0][classes.index(malignant_label)]
-            )
-            writer.writerow([
-                *(f"{float(value):.12g}" for value in values),
-                dataset.target_names[label],
-                dataset.target_names[row_prediction],
-                f"{malignant_probability:.12g}",
-            ])
+    demo_cases = []
+    for values, label in rows:
+        row_prediction = int(selected_estimator.predict([values])[0])
+        classes = [int(class_label) for class_label in selected_estimator.classes_]
+        malignant_probability = float(
+            selected_estimator.predict_proba([values])[0][classes.index(malignant_label)]
+        )
+        demo_cases.append({
+            "features": {str(name): float(value) for name, value in zip(dataset.feature_names, values)},
+            "true_label": str(dataset.target_names[label]),
+            "selected_model_prediction": str(dataset.target_names[row_prediction]),
+            "selected_model_malignant_probability": malignant_probability,
+        })
+    DEMO_PATH.write_text(json.dumps(demo_cases, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:
@@ -270,6 +291,7 @@ def main() -> None:
     )
     X_train, X_test = X[train_indices], X[test_indices]
     y_train, y_test = y[train_indices], y[test_indices]
+    write_dataset_files(dataset, train_indices, test_indices)
 
     def malignant_roc_auc(estimator, features, labels):
         classes = [int(label) for label in estimator.classes_]
@@ -423,6 +445,8 @@ def main() -> None:
         "data_quality_report": str(QUALITY_PATH),
         "plots": {"roc_curves": str(ROC_PLOT_PATH), "confusion_matrices": str(CONFUSION_PLOT_PATH)},
         "demo_cases": str(DEMO_PATH),
+        "training_data": str(TRAINING_DATA_PATH),
+        "testing_data": str(TESTING_DATA_PATH),
         "demo_profiles_source": "One confidently classified benign and one confidently classified malignant row, selected from the training split only.",
         "library_versions": {
             "python": platform.python_version(),

@@ -58,7 +58,7 @@ Inputs live in the active Streamlit session only. The project has no accounts, d
 
 ## Model training and selection
 
-The training script uses scikit-learn's bundled WDBC data (569 rows, 30 features). No separate training-data download is required. To rebuild all artifacts:
+The training script uses scikit-learn's bundled WDBC data (569 rows, 30 features). No separate training-data download is required. It saves the deterministic training and test sets separately as `training_data.json` and `testing_data.json`; both files contain JSON records with a `source_index`, a `features` object, and a `target` label. The split uses seed 42 and preserves the class proportions. To rebuild all artifacts:
 
 ```bash
 python train_model.py
@@ -115,8 +115,12 @@ Running `python train_model.py` creates or replaces:
 | `models/data_quality_report.json` | Pre-split dataset quality audit, class counts, and per-feature ranges. |
 | `models/roc_curves.png` | Held-out ROC curves for all three models. |
 | `models/confusion_matrices.png` | Held-out confusion matrices for all three models. |
-| `demo_cases.csv` | Six held-out rows: three benign and three malignant, all 30 measurements, true label, and selected-model prediction and score for comparison. |
+| `training_data.json` | All 455 stratified training records, with 30 measurements, labels, and source row indices. |
+| `testing_data.json` | All 114 held-out test records, with 30 measurements, labels, and source row indices. |
+| `demo_cases.json` | Six held-out rows: three benign and three malignant, with measurements, true labels, and selected-model predictions and scores. |
 | `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
+
+`training_data.json` contains the 455 records used for cross-validation, model selection, and fitting. `testing_data.json` contains the 114 held-out records used for the one-time evaluation. `demo_cases.json` is a six-record sample taken from the test set; it is not the full test set. The split metadata and original dataset row index are included so records can be traced to the source dataset.
 
 
 The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. Demo profiles are chosen from the training split, not the held-out test set. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
@@ -127,10 +131,13 @@ The application only loads `models/breast_cancer_model.joblib`. It validates the
 | --- | --- |
 | `app.py` | Streamlit input form, session-only input state, schema/range checks, and inference. |
 | `train_model.py` | Fixed three-model grid search, cross-validation selection, holdout evaluation, plots, evidence, and demo-case export. |
+| `run` | Starts the Streamlit app on port 3001 using the project virtual environment. |
 | `requirements.txt` | Python app and training dependencies. |
 | `.python-version` | Preferred Python version for compatible hosting platforms. |
 | `.streamlit/config.toml` | Light theme configuration; no fixed server port. |
-| `demo_cases.csv` | Six labeled cases from the held-out test split. |
+| `training_data.json` | Full training split as labeled JSON records. |
+| `testing_data.json` | Full held-out test split as labeled JSON records. |
+| `demo_cases.json` | Six labeled cases from the held-out test split. |
 | `models/` | Selected model, evidence JSON, and evaluation plots. |
 | `models/pip-freeze.txt` | Local environment's `pip freeze` output. |
 

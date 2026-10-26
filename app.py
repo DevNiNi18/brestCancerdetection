@@ -40,40 +40,6 @@ GROUPS = [
     ("worst", "Worst", "Largest or most irregular values for each feature."),
 ]
 
-# Example WDBC feature vector used only to make non-clinical test inputs.
-EXAMPLE = {
-    "mean_radius": 17.99,
-    "mean_texture": 10.38,
-    "mean_perimeter": 122.8,
-    "mean_area": 1001.0,
-    "mean_smoothness": 0.1184,
-    "mean_compactness": 0.2776,
-    "mean_concavity": 0.3001,
-    "mean_concave_points": 0.1471,
-    "mean_symmetry": 0.2419,
-    "mean_fractal_dimension": 0.07871,
-    "se_radius": 1.095,
-    "se_texture": 0.9053,
-    "se_perimeter": 8.589,
-    "se_area": 153.4,
-    "se_smoothness": 0.006399,
-    "se_compactness": 0.04904,
-    "se_concavity": 0.05373,
-    "se_concave_points": 0.01587,
-    "se_symmetry": 0.03003,
-    "se_fractal_dimension": 0.006193,
-    "worst_radius": 25.38,
-    "worst_texture": 17.33,
-    "worst_perimeter": 184.6,
-    "worst_area": 2019.0,
-    "worst_smoothness": 0.1622,
-    "worst_compactness": 0.6656,
-    "worst_concavity": 0.7119,
-    "worst_concave_points": 0.2654,
-    "worst_symmetry": 0.4601,
-    "worst_fractal_dimension": 0.1189,
-}
-
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "breast_cancer_model.joblib"
 
 
@@ -108,16 +74,20 @@ def is_valid_measurement(value) -> bool:
     return math.isfinite(number) and number >= 0
 
 
-def load_test_input() -> None:
+def load_demo_input() -> None:
+    if not demo_profiles:
+        return
+    previous_profile = st.session_state.get("last_demo_profile", "malignant")
+    profile_name = "malignant" if previous_profile == "benign" else "benign"
+    profile = demo_profiles[profile_name]
     values = {}
-    for feature, _, _ in FEATURES:
-        mean = EXAMPLE[f"mean_{feature}"] * random.uniform(0.88, 1.12)
-        standard_error = EXAMPLE[f"se_{feature}"] * random.uniform(0.80, 1.20)
-        worst_ratio = EXAMPLE[f"worst_{feature}"] / EXAMPLE[f"mean_{feature}"]
-        values[f"mean_{feature}"] = float(f"{mean:.5g}")
-        values[f"se_{feature}"] = float(f"{standard_error:.5g}")
-        values[f"worst_{feature}"] = float(f"{mean * worst_ratio * random.uniform(0.92, 1.08):.5g}")
-
+    for input_key, value in profile.items():
+        randomized_value = float(value) * random.uniform(0.99, 1.01)
+        limits = demo_ranges.get(input_key)
+        if limits:
+            randomized_value = min(max(randomized_value, limits["min"]), limits["max"])
+        values[input_key] = float(f"{randomized_value:.5g}")
+    st.session_state["last_demo_profile"] = profile_name
     st.session_state["measurement_values"] = values
     for input_key, value in values.items():
         st.session_state[f"field_{input_key}"] = value
@@ -216,6 +186,9 @@ else:
     model_status = "● Train the model to begin"
     model_status_class = "missing"
 
+demo_profiles = model_bundle.get("demo_profiles", {}) if model_bundle is not None else {}
+demo_ranges = model_bundle.get("training_ranges", {}) if model_bundle is not None else {}
+
 measurement_values = st.session_state["measurement_values"]
 filled_count = sum(1 for value in measurement_values.values() if value is not None)
 st.markdown(
@@ -246,9 +219,10 @@ with st.container(border=True):
     with test_column:
         st.button(
             "Fill with demo values",
-            help="Fill all fields with randomized values derived from one dataset example; these are not test cases.",
-            on_click=load_test_input,
+            help="Fill all fields with randomized values based on one of two training examples; these are not test cases.",
+            on_click=load_demo_input,
             use_container_width=True,
+            disabled=not demo_profiles,
         )
 
     st.markdown('<hr class="card-divider">', unsafe_allow_html=True)

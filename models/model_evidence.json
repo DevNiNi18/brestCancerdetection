@@ -679,7 +679,7 @@
         "n_estimators": 100
       },
       "mean_roc_auc": 0.9902992776057792,
-      "std_roc_auc": 0.007182543917979523,
+      "std_roc_auc": 0.007182543917979536,
       "mean_recall": 0.9411764705882352,
       "std_recall": 0.04159451654038516,
       "mean_precision": 0.9543849206349206,
@@ -1031,6 +1031,7 @@
     "confusion_matrices": "models/confusion_matrices.png"
   },
   "demo_cases": "demo_cases.csv",
+  "demo_profiles_source": "One confidently classified benign and one confidently classified malignant row, selected from the training split only.",
   "library_versions": {
     "python": "3.9.6",
     "scikit_learn": "1.6.1",

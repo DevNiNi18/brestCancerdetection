@@ -49,7 +49,7 @@ The project supports Python 3.9 through 3.13. `.python-version` selects Python 3
 1. Select **Mean**, **Standard error**, or **Worst**.
 2. Enter the 10 non-negative measurements for each section. Values are in dataset units; do not convert them.
 3. Complete all 30 fields and click **Get prediction**.
-4. Use **Fill with demo values** to fill the form with randomized values derived from one dataset example. These values are not test cases.
+4. Use **Fill with demo values** to alternate between randomized benign and malignant examples selected from the training split. They are not test cases.
 5. Click **Clear inputs** to reset the current session.
 
 The app displays the predicted dataset class and both class scores. The malignant score is a model-estimated probability and is not calibrated as an individual risk estimate. Values outside the training ranges produce a warning, but the app still returns the model output.
@@ -106,7 +106,7 @@ Running `python train_model.py` creates or replaces:
 
 | Path | Contents |
 | --- | --- |
-| `models/breast_cancer_model.joblib` | Selected tuned pipeline, saved training-split ranges, feature names and input keys, positive-class label, and run metadata. |
+| `models/breast_cancer_model.joblib` | Selected tuned pipeline, training-split demo profiles and ranges, feature names and input keys, positive-class label, and run metadata. |
 | `models/model_evidence.json` | Every grid combination's CV scores, best parameters, selection decision, test metrics for all three models, confusion matrices, and library versions. |
 | `models/roc_curves.png` | Held-out ROC curves for all three models. |
 | `models/confusion_matrices.png` | Held-out confusion matrices for all three models. |
@@ -114,7 +114,7 @@ Running `python train_model.py` creates or replaces:
 | `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
 
 
-The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
+The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. Demo profiles are chosen from the training split, not the held-out test set. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
 
 ## Project files
 

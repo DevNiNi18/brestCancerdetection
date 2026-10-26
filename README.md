@@ -1,206 +1,139 @@
 ---
-title: "BreastCare AI"
+title: "Breast Cancer Prediction Prototype"
 subtitle: "Project Guide"
 ---
 
-# BreastCare AI
+# Breast Cancer Prediction Prototype
 
-BreastCare AI is a Python and Streamlit prototype for entering the 30 numerical measurements in the Wisconsin Diagnostic Breast Cancer (WDBC) dataset and viewing a Random Forest model output.
+A Python and Streamlit learning prototype for entering the 30 measurements from the Wisconsin Diagnostic Breast Cancer (WDBC) dataset and viewing a model prediction. The training script compares exactly three classifiers: Logistic Regression, SVM, and Random Forest. It selects one using cross-validation only; the app loads that saved model and never trains during a prediction.
 
-**Current status:** a trained Random Forest model is connected to the app. After all 30 measurements are entered, **Get prediction** displays the predicted dataset class and the model's class scores.
+> **Clinical limitation:** This is an educational demonstration, not a diagnostic tool or medical device. The dataset and evaluation do not establish clinical performance. This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings.
 
-> **Clinical limitation:** This is an educational demonstration, not a diagnostic tool or medical device. The model was trained on a small public dataset and has not been validated for clinical use. Do not use the output to diagnose, treat, or make decisions about a patient.
+## Clone and run
 
-## Contents
-
-- [What the app does](#what-the-app-does)
-- [Measurement fields](#measurement-fields)
-- [Install and run](#install-and-run)
-- [Using the interface](#using-the-interface)
-- [Model and evaluation](#model-and-evaluation)
-- [Project files](#project-files)
-- [Data handling](#data-handling)
-- [Limitations and next steps](#limitations-and-next-steps)
-- [Troubleshooting](#troubleshooting)
-
-## What the app does
-
-- Shows a prediction page with an overall 30-field progress bar.
-- Groups inputs into **Mean**, **Standard error**, and **Worst** sections, each containing the same 10 measurements.
-- Lets you switch sections using the large selectors above the measurement fields.
-- Provides **Use test input** to fill all 30 fields with randomized example values.
-- Provides **Clear inputs** to reset the current session.
-- Sends complete inputs to the locally saved Random Forest model and displays its predicted WDBC class and class scores.
-- Runs at `http://localhost:3001` with the command below. Streamlit hosting platforms choose their own listening port.
-
-The app does not include authentication, a patient directory, assessment history, or a database.
-
-## Measurement fields
-
-Enter the numerical values from the source that generated the WDBC measurements. Each value must be non-negative. Avoid unit conversions unless they are required by the model's documented input schema.
-
-| Feature | Unit shown in the app |
-| --- | --- |
-| Radius | mm |
-| Texture | gray scale |
-| Perimeter | mm |
-| Area | mm² |
-| Smoothness | ratio |
-| Compactness | ratio |
-| Concavity | ratio |
-| Concave points | count |
-| Symmetry | ratio |
-| Fractal dimension | ratio |
-
-The sections represent the mean, standard error, and worst (largest or most irregular) values for each feature. The model bundle stores the expected input-key order, and the app uses that order to assemble the row passed to the estimator. The Random Forest was trained on raw values without scaling.
-
-## Install and run
-
-### Requirements
-
-- Python 3.9 through 3.13
-- pip
-- A modern web browser
-
-The app and training libraries are listed in [`requirements.txt`](requirements.txt). A compatible environment is already set up in `.venv` for this project.
-
-### Start the app
-
-From the project directory, activate the environment and run Streamlit:
-
-macOS/Linux:
+Clone the GitHub repository and enter its directory:
 
 ```bash
-source .venv/bin/activate
-streamlit run app.py --server.port 3001
+git clone https://github.com/OtieteAyebanua/brestCancerdetection.git
+cd brestCancerdetection
 ```
 
-Windows PowerShell:
+Create a Python environment, install the dependencies, and start the app:
 
-```powershell
-.venv\Scripts\Activate.ps1
-streamlit run app.py --server.port 3001
-```
-
-Open <http://localhost:3001>. Stop the app with **Ctrl+C** in the terminal. The repository does not pin a server address or port in its Streamlit configuration, so hosted environments can use their assigned port.
-
-### Create a new environment
-
-If `.venv` is not present, install a supported Python version, then create the environment and install dependencies:
+macOS/Linux:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+streamlit run app.py --server.port 3001
 ```
 
-On Windows, use `py -3.13 -m venv .venv` and activate it with `.venv\Scripts\Activate.ps1`.
+Windows PowerShell:
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+streamlit run app.py --server.port 3001
+```
+
+Open <http://localhost:3001>. Stop the app with **Ctrl+C**. The Streamlit config sets the light theme but leaves the listening address and port to the host, so hosted environments can choose their own port.
+
+The project supports Python 3.9 through 3.13. `.python-version` selects Python 3.13 on platforms that use that file.
 
 ## Using the interface
 
 1. Select **Mean**, **Standard error**, or **Worst**.
-2. Enter the 10 values for that section. The selector and page progress display update as values are added.
-3. Repeat until all 30 fields are filled.
-4. Click **Get prediction** to display the predicted dataset class and class scores.
-5. Click **Clear inputs** to reset the form.
+2. Enter the 10 non-negative measurements for each section. Values are in dataset units; do not convert them.
+3. Complete all 30 fields and click **Get prediction**.
+4. Use **Fill with demo values** to fill the form with randomized values derived from one dataset example. These values are not test cases.
+5. Click **Clear inputs** to reset the current session.
 
-**Use test input** fills the form with randomized values derived by perturbing an example WDBC feature vector. The values are for interface demonstration only; they are not independent test cases or clinical data.
+The app displays the predicted dataset class and both class scores. The malignant score is a model-estimated probability and is not calibrated as an individual risk estimate. Values outside the training ranges produce a warning, but the app still returns the model output.
 
-The displayed class scores come from the Random Forest estimator. They are not calibrated estimates of an individual patient's cancer risk.
+Inputs live in the active Streamlit session only. The project has no accounts, database, assessment history, or application-level input saving. When hosted, inputs are sent to the server running Streamlit to perform inference; hosting and server logging are outside this repository's control.
 
-## Model and evaluation
+## Model training and selection
 
-The app loads [`models/breast_cancer_random_forest.joblib`](models/breast_cancer_random_forest.joblib). The bundle contains the fitted estimator, target labels, expected feature names and input keys, scikit-learn version, and holdout evaluation. [`models/breast_cancer_random_forest.metrics.json`](models/breast_cancer_random_forest.metrics.json) contains the detailed metrics from the training run.
-
-The model was trained by [`train_model.py`](train_model.py) using scikit-learn's bundled WDBC dataset. No external CSV download is needed. The script uses a stratified 80/20 train/holdout split to report evaluation metrics, then fits the saved estimator on the full bundled dataset.
-
-Holdout results from the included run:
-
-| Metric | Result |
-| --- | ---: |
-| Accuracy | 94.7% |
-| Balanced accuracy | 94.3% |
-| Malignant sensitivity (recall) | 92.9% |
-| Benign specificity (recall) | 95.8% |
-| Malignant ROC AUC | 0.994 |
-
-The holdout contained 114 records. The confusion matrix, with rows as actual classes and columns as predicted classes in the order malignant then benign, was:
-
-| Actual \\ predicted | Malignant | Benign |
-| --- | ---: | ---: |
-| Malignant | 39 | 3 |
-| Benign | 3 | 69 |
-
-These are results from one split of a small, public benchmark dataset. They do not demonstrate performance on new hospitals, populations, imaging workflows, or real patient cases and must not be interpreted as clinical validation.
-
-### Retrain the model
-
-Activate `.venv`, then run:
+The training script uses scikit-learn's bundled WDBC data (569 rows, 30 features). No separate training-data download is required. To rebuild all artifacts:
 
 ```bash
 python train_model.py
 ```
 
-The script writes the model bundle and its metrics JSON to the `models/` directory, replacing the existing files. Optional parameters include:
+The procedure is fixed:
 
-```bash
-python train_model.py --test-size 0.25 --random-state 7 --n-estimators 600
-python train_model.py --output models/custom_model.joblib
-```
+1. Make one stratified 80/20 train/test split with seed 42.
+2. Run five-fold stratified cross-validation with shuffle and seed 42 on the training split only. Scaling is fitted inside each fold for Logistic Regression and SVM; Random Forest uses raw values.
+3. Grid-search ROC-AUC, malignant recall, malignant precision, F1, and accuracy, refitting each model on ROC-AUC.
+4. Select among models whose mean CV ROC-AUC is within 0.01 of the best. Choose the highest malignant recall, breaking ties by F1 and then simplicity: Logistic Regression, SVM, Random Forest.
+5. Evaluate all three tuned models on the held-out test split once, after selection. Save the selected tuned estimator exactly as evaluated, fitted on the training split only.
 
-The app expects the default model path and a compatible bundle schema. If you use a custom output path, copy it to the default path or update `MODEL_PATH` in `app.py`.
+No class weighting is used. The requested parameter grids are run in full.
+
+### Best cross-validation results
+
+Metrics are means across the five training folds. Recall, precision, F1, and ROC-AUC treat malignant as the positive class.
+
+| Model | Best parameters | ROC-AUC | Recall | Precision | F1 | Accuracy |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Logistic Regression | `C=1` | 0.9959 | 0.9647 | 0.9770 | 0.9703 | 0.9780 |
+| SVM | `kernel=rbf, C=10, gamma=0.01` | 0.9964 | 0.9529 | 0.9820 | 0.9668 | 0.9758 |
+| Random Forest | `n_estimators=300, max_depth=5, min_samples_split=2` | 0.9909 | 0.9412 | 0.9490 | 0.9442 | 0.9582 |
+
+**Selected model: Logistic Regression.** All three models fall within 0.01 of the highest mean CV ROC-AUC. Logistic Regression has the highest mean malignant recall among them.
+
+### One-time held-out test results
+
+The test split contains 114 cases (42 malignant, 72 benign). It was not used for tuning or model selection.
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC | Confusion matrix¹ |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Logistic Regression | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9954 | `[[41, 1], [1, 71]]` |
+| SVM | 0.9825 | 0.9762 | 0.9762 | 0.9762 | 0.9977 | `[[41, 1], [1, 71]]` |
+| Random Forest | 0.9561 | 0.9512 | 0.9286 | 0.9398 | 0.9927 | `[[39, 3], [2, 70]]` |
+
+¹ Rows are actual and columns predicted, ordered malignant then benign.
+
+These are results for a single split of a small public benchmark dataset. They are not external validation, clinical validation, or evidence of performance on new hospitals, populations, or workflows.
+
+## Generated artifacts
+
+Running `python train_model.py` creates or replaces:
+
+| Path | Contents |
+| --- | --- |
+| `models/breast_cancer_model.joblib` | Selected tuned pipeline, saved training-split ranges, feature names and input keys, positive-class label, and run metadata. |
+| `models/model_evidence.json` | Every grid combination's CV scores, best parameters, selection decision, test metrics for all three models, confusion matrices, and library versions. |
+| `models/roc_curves.png` | Held-out ROC curves for all three models. |
+| `models/confusion_matrices.png` | Held-out confusion matrices for all three models. |
+| `demo_cases.csv` | Six held-out rows: three benign and three malignant, all 30 measurements, true label, and selected-model prediction and score for comparison. |
+| `models/pip-freeze.txt` | Exact Python package versions installed in the local training environment. |
+
+UI captures are in [`screenshots/`](screenshots/): the blank form, disabled submit state, range warning, benign and malignant outputs, and the diagnostic notice.
+
+The application only loads `models/breast_cancer_model.joblib`. It validates the bundle schema and never retrains. If a measurement is outside its training-split minimum or maximum, the app warns that its prediction may be unreliable and still allows the prediction.
 
 ## Project files
 
 | Path | Purpose |
 | --- | --- |
-| [`app.py`](app.py) | Streamlit interface, session-only form state, test input generation, input checks, and model inference. |
-| [`train_model.py`](train_model.py) | Random Forest training, holdout evaluation, and artifact generation. |
-| [`requirements.txt`](requirements.txt) | Streamlit and machine-learning dependencies. |
-| [`.streamlit/config.toml`](.streamlit/config.toml) | Sets the app's light theme; the host chooses the listening address and port. |
-| `models/breast_cancer_random_forest.joblib` | Model bundle loaded by the app. |
-| `models/breast_cancer_random_forest.metrics.json` | Detailed holdout metrics from the included training run. |
+| `app.py` | Streamlit input form, session-only input state, schema/range checks, and inference. |
+| `train_model.py` | Fixed three-model grid search, cross-validation selection, holdout evaluation, plots, evidence, and demo-case export. |
+| `requirements.txt` | Python app and training dependencies. |
+| `.python-version` | Preferred Python version for compatible hosting platforms. |
+| `.streamlit/config.toml` | Light theme configuration; no fixed server port. |
+| `demo_cases.csv` | Six labeled cases from the held-out test split. |
+| `models/` | Selected model, evidence JSON, and evaluation plots. |
+| `models/pip-freeze.txt` | Local environment's `pip freeze` output. |
 
-## Data handling
+## Limitations
 
-The interface does not ask for a patient's name or medical record number. This app has no database and does not write entered measurements to files. Measurements are kept in Streamlit session state for the active session; clearing the form, ending the session, or stopping the app can discard them.
-
-When deployed, entered values are sent to the computer or server running Streamlit so the app can perform inference. Hosting, proxy, and server logging are not configured by this repository. Avoid entering identifiable patient information.
-
-## Limitations and next steps
-
-- The model uses a small, bundled public dataset and is intended for learning and interface demonstration.
-- The held-out evaluation is one stratified split and is not an external or clinical validation.
-- The app does not implement model calibration, clinical thresholds, uncertainty handling, or workflow review.
-- The **Use test input** values are generated examples, not training data or valid clinical cases.
-- Any real-world use would require appropriate representative data, independent evaluation, clinical oversight, and review of applicable regulatory requirements.
-
-## Troubleshooting
-
-### `streamlit: command not found`
-
-Activate the virtual environment and install dependencies:
-
-```bash
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-You can also start Streamlit as a module with `python -m streamlit run app.py --server.port 3001`.
-
-### Port 3001 is already in use
-
-Run the app on another port for this session:
-
-```bash
-streamlit run app.py --server.port 3002
-```
-
-### The model cannot be loaded
-
-Check that `models/breast_cancer_random_forest.joblib` exists and that the virtual environment dependencies are installed. Retrain it with `python train_model.py` if needed.
-
-### Test values or entered values disappear
-
-Values are session-only. Use **Use test input** again or re-enter the values; the app has no save or recovery feature.
+- This is a classroom prototype, not a clinical tool.
+- The bundled dataset is small and cannot establish clinical validity or population-level reliability.
+- Model probabilities are not calibrated patient-risk estimates.
+- The interface does not provide diagnosis, treatment advice, patient accounts, storage, or history.
+- Demo values are randomized perturbations of one dataset example, not the held-out demo cases and not clinical cases.

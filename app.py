@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import math
 from pathlib import Path
 
 import joblib
@@ -8,16 +9,16 @@ import streamlit as st
 
 
 FEATURES = [
-    ("radius", "Radius", "mm"),
-    ("texture", "Texture", "gray scale"),
-    ("perimeter", "Perimeter", "mm"),
-    ("area", "Area", "mm²"),
-    ("smoothness", "Smoothness", "ratio"),
-    ("compactness", "Compactness", "ratio"),
-    ("concavity", "Concavity", "ratio"),
-    ("concave_points", "Concave points", "count"),
-    ("symmetry", "Symmetry", "ratio"),
-    ("fractal_dimension", "Fractal dimension", "ratio"),
+    ("radius", "Radius", "dataset units"),
+    ("texture", "Texture", "dataset units"),
+    ("perimeter", "Perimeter", "dataset units"),
+    ("area", "Area", "dataset units"),
+    ("smoothness", "Smoothness", "dataset units"),
+    ("compactness", "Compactness", "dataset units"),
+    ("concavity", "Concavity", "dataset units"),
+    ("concave_points", "Concave points", "dataset units"),
+    ("symmetry", "Symmetry", "dataset units"),
+    ("fractal_dimension", "Fractal dimension", "dataset units"),
 ]
 
 FEATURE_HELP = {
@@ -73,7 +74,7 @@ EXAMPLE = {
     "worst_fractal_dimension": 0.1189,
 }
 
-MODEL_PATH = Path(__file__).resolve().parent / "models" / "breast_cancer_random_forest.joblib"
+MODEL_PATH = Path(__file__).resolve().parent / "models" / "breast_cancer_model.joblib"
 
 
 @st.cache_resource
@@ -99,6 +100,14 @@ def persist_measurement(input_key: str, widget_key: str) -> None:
     st.session_state["measurement_values"] = values
 
 
+def is_valid_measurement(value) -> bool:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(number) and number >= 0
+
+
 def load_test_input() -> None:
     values = {}
     for feature, _, _ in FEATURES:
@@ -113,7 +122,7 @@ def load_test_input() -> None:
     for input_key, value in values.items():
         st.session_state[f"field_{input_key}"] = value
 
-st.set_page_config(page_title="BreastCare AI · Prediction", page_icon="✚", layout="wide")
+st.set_page_config(page_title="Breast Cancer Prediction Prototype", page_icon="✚", layout="wide")
 
 # Keep a durable copy separate from Streamlit's per-section widget state. Streamlit
 # removes the widget state for a section when its controls are no longer rendered.
@@ -198,7 +207,7 @@ if MODEL_PATH.exists():
         model_load_error = str(error)
 
 if model_bundle is not None:
-    model_status = "● Demo model loaded"
+    model_status = f"● {model_bundle.get('model_name', 'Selected model')} loaded"
     model_status_class = "ready"
 elif model_load_error:
     model_status = "● Model needs attention"
@@ -220,6 +229,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+if model_load_error:
+    st.error(f"The trained model bundle could not be loaded: {model_load_error}")
+elif model_bundle is None:
+    st.error("The trained model bundle is missing. Restore `models/breast_cancer_model.joblib` to enable predictions.")
+
 prediction_clicked = False
 with st.container(border=True):
     title_column, test_column = st.columns([5, 1])
@@ -231,8 +245,8 @@ with st.container(border=True):
         )
     with test_column:
         st.button(
-            "Use test input",
-            help="Fill all 30 fields with randomized example values.",
+            "Fill with demo values",
+            help="Fill all fields with randomized values derived from one dataset example; these are not test cases.",
             on_click=load_test_input,
             use_container_width=True,
         )
@@ -313,7 +327,7 @@ with st.container(border=True):
             prediction_clicked = st.button(
                 "Get prediction",
                 type="primary",
-                disabled=filled_count < 30,
+                disabled=filled_count < 30 or model_bundle is None or model_load_error is not None,
                 use_container_width=True,
             )
 
@@ -325,16 +339,35 @@ if prediction_clicked:
     }
     if any(value is None for value in input_values.values()):
         st.error("Enter all 30 measurements before requesting a prediction.")
+    elif not all(is_valid_measurement(value) for value in input_values.values()):
+        st.error("Enter a finite numeric measurement of zero or greater in each field.")
     elif model_load_error:
         st.error(f"The trained model could not be loaded: {model_load_error}")
     elif model_bundle is None:
         st.error("No trained model was found. Run `python train_model.py` first.")
     else:
-        expected_keys = model_bundle["input_keys"]
-        all_keys = set(input_values)
-        if len(expected_keys) != 30 or set(expected_keys) != all_keys:
+        expected_keys = model_bundle.get("input_keys", [])
+        feature_names = model_bundle.get("input_features", [])
+        training_ranges = model_bundle.get("training_ranges", {})
+        schema_ok = (
+            len(expected_keys) == 30
+            and len(feature_names) == 30
+            and set(expected_keys) == set(input_values)
+            and set(training_ranges) == set(expected_keys)
+            and model_bundle.get("positive_class") == "malignant"
+        )
+        if not schema_ok:
             st.error("The model's feature schema does not match the 30 inputs in this app.")
         else:
+            out_of_range = []
+            feature_name_by_key = dict(zip(expected_keys, feature_names))
+            for key in expected_keys:
+                lower = training_ranges[key]["min"]
+                upper = training_ranges[key]["max"]
+                value = float(input_values[key])
+                if value < lower or value > upper:
+                    out_of_range.append(f"{feature_name_by_key[key]} ({lower:.5g}–{upper:.5g})")
+
             ordered_values = [[float(input_values[key]) for key in expected_keys]]
             estimator = model_bundle["model"]
             predicted_label = int(estimator.predict(ordered_values)[0])
@@ -348,17 +381,22 @@ if prediction_clicked:
 
             score_cards = "".join(
                 f'<div class="score-item"><div class="score-label">{str(class_names[label]).title()} class score</div>'
-                f'<div class="score-value">{score_by_name[str(class_names[label]).lower()]:.1%}</div></div>'
+                f'<div class="score-value">{score_by_name[str(class_names[label]).lower()]:.3%}</div></div>'
                 for label in class_labels
             )
             st.markdown(
                 f'<div class="result-panel"><h2 class="result-title">Model output</h2>'
                 f'<div class="result-class">Model classification: {class_names[predicted_label].title()}</div>'
                 f'<div class="score-row">{score_cards}</div>'
-                '<p class="result-footnote">Class scores are Random Forest outputs, not calibrated patient risk. '
-                'This demonstration model is not validated for clinical use.</p></div>',
+                '<p class="result-footnote">Model-estimated probabilities are not calibrated estimates of individual risk. '
+                'This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings.</p></div>',
                 unsafe_allow_html=True,
             )
+            if out_of_range:
+                st.warning(
+                    "One or more values are outside the training data ranges. The result may be unreliable. "
+                    "Out-of-range measurements: " + ", ".join(out_of_range)
+                )
 
 st.markdown(
     '<p class="privacy-note">Inputs stay in this page session and are cleared when you leave or clear the form. '

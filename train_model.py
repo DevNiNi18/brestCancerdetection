@@ -1,36 +1,61 @@
-"""Train and evaluate a Random Forest on scikit-learn's bundled WDBC dataset.
+"""Tune, compare, and save the specified WDBC breast-cancer classifiers.
 
-This script is for development and education. The resulting model is not
-clinically validated and must not be used to guide patient care.
+The test split is held back until every grid search and the model-selection rule
+are complete. The selected tuned pipeline is saved as evaluated, without fitting
+it again on the held-out records or the full dataset.
 """
 
 from __future__ import annotations
 
-import argparse
+import csv
 import json
+import platform
+from importlib.metadata import version
 from pathlib import Path
 
 import joblib
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import sklearn
 from sklearn.datasets import load_breast_cancer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
-    balanced_accuracy_score,
-    classification_report,
+    auc,
     confusion_matrix,
+    f1_score,
+    make_scorer,
     precision_score,
     recall_score,
     roc_auc_score,
+    roc_curve,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+
+
+SEED = 42
+TEST_SIZE = 0.20
+OUTPUT_DIR = Path("models")
+MODEL_PATH = OUTPUT_DIR / "breast_cancer_model.joblib"
+EVIDENCE_PATH = OUTPUT_DIR / "model_evidence.json"
+ROC_PLOT_PATH = OUTPUT_DIR / "roc_curves.png"
+CONFUSION_PLOT_PATH = OUTPUT_DIR / "confusion_matrices.png"
+DEMO_PATH = Path("demo_cases.csv")
+
+MODEL_ORDER = {"Logistic Regression": 0, "SVM": 1, "Random Forest": 2}
 
 
 def app_input_key(dataset_feature_name: str) -> str:
     """Map a scikit-learn WDBC feature name to the Streamlit form key."""
     parts = dataset_feature_name.split()
-
     if parts[0] == "mean":
         group, feature_parts = "mean", parts[1:]
     elif parts[0] == "worst":
@@ -39,146 +64,324 @@ def app_input_key(dataset_feature_name: str) -> str:
         group, feature_parts = "se", parts[:-1]
     else:
         raise ValueError(f"Unrecognized WDBC feature name: {dataset_feature_name}")
-
     return f"{group}_{'_'.join(feature_parts)}"
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Train a Random Forest using scikit-learn's bundled WDBC dataset."
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("models/breast_cancer_random_forest.joblib"),
-        help="Path where the trained model bundle will be saved.",
-    )
-    parser.add_argument(
-        "--test-size",
-        type=float,
-        default=0.2,
-        help="Fraction of observations reserved for a stratified holdout evaluation (default: 0.2).",
-    )
-    parser.add_argument(
-        "--random-state",
-        type=int,
-        default=42,
-        help="Seed used for reproducible splitting and model training (default: 42).",
-    )
-    parser.add_argument(
-        "--n-estimators",
-        type=int,
-        default=400,
-        help="Number of trees in each Random Forest (default: 400).",
-    )
-    args = parser.parse_args()
+def make_models_and_grids():
+    """Return only the three models and parameter grids required by the brief."""
+    models = {
+        "Logistic Regression": (
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", LogisticRegression(solver="lbfgs", max_iter=1000, random_state=SEED)),
+            ]),
+            {
+                "classifier__C": [0.01, 0.1, 1, 10, 100],
+            },
+        ),
+        "SVM": (
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", SVC(probability=True, random_state=SEED)),
+            ]),
+            {
+                "classifier__kernel": ["linear", "rbf"],
+                "classifier__C": [0.1, 1, 10, 100],
+                "classifier__gamma": ["scale", 0.01, 0.001],
+            },
+        ),
+        "Random Forest": (
+            RandomForestClassifier(random_state=SEED, n_jobs=-1),
+            {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [None, 5, 10],
+                "min_samples_split": [2, 5],
+            },
+        ),
+    }
+    return models
 
-    if not 0.1 <= args.test_size <= 0.5:
-        parser.error("--test-size must be between 0.1 and 0.5")
-    if args.n_estimators < 1:
-        parser.error("--n-estimators must be at least 1")
 
-    return args
+def build_cv_records(model_name: str, search: GridSearchCV) -> list[dict]:
+    """Flatten every parameter combination and all requested CV metrics."""
+    results = search.cv_results_
+    records = []
+    for index, params in enumerate(results["params"]):
+        records.append({
+            "model": model_name,
+            "parameters": params,
+            "mean_roc_auc": float(results["mean_test_roc_auc"][index]),
+            "std_roc_auc": float(results["std_test_roc_auc"][index]),
+            "mean_recall": float(results["mean_test_recall"][index]),
+            "std_recall": float(results["std_test_recall"][index]),
+            "mean_precision": float(results["mean_test_precision"][index]),
+            "std_precision": float(results["std_test_precision"][index]),
+            "mean_f1": float(results["mean_test_f1"][index]),
+            "std_f1": float(results["std_test_f1"][index]),
+            "mean_accuracy": float(results["mean_test_accuracy"][index]),
+            "std_accuracy": float(results["std_test_accuracy"][index]),
+            "rank_roc_auc": int(results["rank_test_roc_auc"][index]),
+        })
+    return records
+
+
+def evaluate_test_set(estimator, X_test, y_test, malignant_label: int, benign_label: int) -> dict:
+    predictions = estimator.predict(X_test)
+    class_labels = [int(label) for label in estimator.classes_]
+    malignant_index = class_labels.index(malignant_label)
+    malignant_scores = estimator.predict_proba(X_test)[:, malignant_index]
+    malignant_truth = (y_test == malignant_label).astype(int)
+    matrix = confusion_matrix(y_test, predictions, labels=[malignant_label, benign_label])
+    return {
+        "accuracy": float(accuracy_score(y_test, predictions)),
+        "precision": float(precision_score(y_test, predictions, pos_label=malignant_label, zero_division=0)),
+        "recall": float(recall_score(y_test, predictions, pos_label=malignant_label, zero_division=0)),
+        "f1": float(f1_score(y_test, predictions, pos_label=malignant_label, zero_division=0)),
+        "roc_auc": float(roc_auc_score(malignant_truth, malignant_scores)),
+        "confusion_matrix_labels": ["malignant", "benign"],
+        "confusion_matrix": matrix.tolist(),
+        "malignant_scores": malignant_scores,
+        "malignant_truth": malignant_truth,
+        "predictions": predictions,
+    }
+
+
+def save_comparison_plots(evaluations: dict) -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    fig, axis = plt.subplots(figsize=(8, 7))
+    for model_name, results in evaluations.items():
+        false_positive_rate, true_positive_rate, _ = roc_curve(
+            results["malignant_truth"], results["malignant_scores"]
+        )
+        curve_auc = auc(false_positive_rate, true_positive_rate)
+        axis.plot(false_positive_rate, true_positive_rate, linewidth=2,
+                  label=f"{model_name} (AUC = {curve_auc:.3f})")
+    axis.plot([0, 1], [0, 1], "--", color="#777777", linewidth=1, label="Chance")
+    axis.set(title="ROC curves (malignant is positive)", xlabel="False positive rate", ylabel="True positive rate")
+    axis.legend(loc="lower right")
+    axis.grid(alpha=0.2)
+    fig.tight_layout()
+    fig.savefig(ROC_PLOT_PATH, dpi=160)
+    plt.close(fig)
+
+    fig, axes = plt.subplots(1, len(evaluations), figsize=(15, 4.8))
+    for axis, (model_name, results) in zip(axes, evaluations.items()):
+        matrix = np.asarray(results["confusion_matrix"])
+        axis.imshow(matrix, cmap="Blues")
+        axis.set(title=model_name, xticks=[0, 1], yticks=[0, 1],
+                 xticklabels=["Malignant", "Benign"], yticklabels=["Malignant", "Benign"],
+                 xlabel="Predicted", ylabel="Actual")
+        for row in range(2):
+            for column in range(2):
+                axis.text(column, row, str(matrix[row, column]), ha="center", va="center", color="#162b4d")
+    fig.suptitle("Confusion matrices (malignant first)")
+    fig.tight_layout()
+    fig.savefig(CONFUSION_PLOT_PATH, dpi=160)
+    plt.close(fig)
+
+
+def write_demo_cases(dataset, X_test, y_test, malignant_label, benign_label, selected_estimator) -> None:
+    rows = []
+    for label in (benign_label, malignant_label):
+        matching = np.flatnonzero(y_test == label)[:3]
+        for row_index in matching:
+            rows.append((X_test[row_index], int(label)))
+    if len(rows) != 6:
+        raise RuntimeError("The held-out test set must contain at least three examples of each class.")
+    with DEMO_PATH.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow([
+            *dataset.feature_names,
+            "true_label",
+            "selected_model_prediction",
+            "selected_model_malignant_probability",
+        ])
+        for values, label in rows:
+            row_prediction = int(selected_estimator.predict([values])[0])
+            classes = [int(class_label) for class_label in selected_estimator.classes_]
+            malignant_probability = float(
+                selected_estimator.predict_proba([values])[0][classes.index(malignant_label)]
+            )
+            writer.writerow([
+                *(f"{float(value):.12g}" for value in values),
+                dataset.target_names[label],
+                dataset.target_names[row_prediction],
+                f"{malignant_probability:.12g}",
+            ])
 
 
 def main() -> None:
-    args = parse_args()
     dataset = load_breast_cancer()
-    X = dataset.data
-    y = dataset.target
-
-    # In scikit-learn's bundled dataset: 0 is malignant and 1 is benign.
+    X, y = dataset.data, dataset.target
+    feature_names = list(dataset.feature_names)
+    input_keys = [app_input_key(name) for name in feature_names]
     malignant_label = int(np.flatnonzero(dataset.target_names == "malignant")[0])
     benign_label = int(np.flatnonzero(dataset.target_names == "benign")[0])
-    class_order = [malignant_label, benign_label]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=args.test_size,
-        random_state=args.random_state,
-        stratify=y,
+    # Keep original indices so the selected demonstration cases are auditable.
+    all_indices = np.arange(len(y))
+    train_indices, test_indices = train_test_split(
+        all_indices, test_size=TEST_SIZE, random_state=SEED, stratify=y
     )
+    X_train, X_test = X[train_indices], X[test_indices]
+    y_train, y_test = y[train_indices], y[test_indices]
 
-    evaluation_model = RandomForestClassifier(
-        n_estimators=args.n_estimators,
-        class_weight="balanced",
-        random_state=args.random_state,
-        n_jobs=-1,
-    )
-    evaluation_model.fit(X_train, y_train)
-    predictions = evaluation_model.predict(X_test)
-    class_indices = list(evaluation_model.classes_)
-    malignant_probability = evaluation_model.predict_proba(X_test)[:, class_indices.index(malignant_label)]
-    malignant_truth = (y_test == malignant_label).astype(int)
+    def malignant_roc_auc(estimator, features, labels):
+        classes = [int(label) for label in estimator.classes_]
+        probabilities = estimator.predict_proba(features)[:, classes.index(malignant_label)]
+        return roc_auc_score((labels == malignant_label).astype(int), probabilities)
 
-    report = classification_report(
-        y_test,
-        predictions,
-        labels=class_order,
-        target_names=["malignant", "benign"],
-        output_dict=True,
-        zero_division=0,
-    )
-    matrix = confusion_matrix(y_test, predictions, labels=class_order)
-    metrics = {
-        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
-        "observations": int(len(y)),
-        "training_observations": int(len(y_train)),
-        "holdout_observations": int(len(y_test)),
-        "random_state": args.random_state,
-        "n_estimators": args.n_estimators,
-        "positive_class": "malignant",
-        "accuracy": float(accuracy_score(y_test, predictions)),
-        "balanced_accuracy": float(balanced_accuracy_score(y_test, predictions)),
-        "malignant_precision": float(precision_score(y_test, predictions, pos_label=malignant_label, zero_division=0)),
-        "malignant_recall_sensitivity": float(recall_score(y_test, predictions, pos_label=malignant_label, zero_division=0)),
-        "benign_recall_specificity": float(recall_score(y_test, predictions, pos_label=benign_label, zero_division=0)),
-        "malignant_roc_auc": float(roc_auc_score(malignant_truth, malignant_probability)),
-        "confusion_matrix_labels": ["malignant", "benign"],
-        "confusion_matrix": matrix.tolist(),
-        "classification_report": report,
-        "scikit_learn_version": sklearn.__version__,
-        "warning": "Holdout metrics on a small public dataset are educational and do not establish clinical performance.",
+    scoring = {
+        "roc_auc": malignant_roc_auc,
+        "recall": make_scorer(recall_score, pos_label=malignant_label, zero_division=0),
+        "precision": make_scorer(precision_score, pos_label=malignant_label, zero_division=0),
+        "f1": make_scorer(f1_score, pos_label=malignant_label, zero_division=0),
+        "accuracy": "accuracy",
     }
 
-    # Evaluate on held-out data, then fit the saved model on all available cases.
-    final_model = RandomForestClassifier(
-        n_estimators=args.n_estimators,
-        class_weight="balanced",
-        random_state=args.random_state,
-        n_jobs=-1,
-    )
-    final_model.fit(X, y)
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+    searches = {}
+    cv_records = []
+    for model_name, (pipeline, parameter_grid) in make_models_and_grids().items():
+        print(f"Tuning {model_name}...")
+        search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=parameter_grid,
+            scoring=scoring,
+            refit="roc_auc",
+            cv=folds,
+            n_jobs=-1,
+            return_train_score=False,
+            error_score="raise",
+        )
+        search.fit(X_train, y_train)
+        searches[model_name] = search
+        cv_records.extend(build_cv_records(model_name, search))
 
-    feature_names = list(dataset.feature_names)
-    bundle = {
-        "model": final_model,
+    best_cv = {
+        name: {
+            "best_parameters": search.best_params_,
+            "mean_roc_auc": float(search.cv_results_["mean_test_roc_auc"][search.best_index_]),
+            "mean_recall": float(search.cv_results_["mean_test_recall"][search.best_index_]),
+            "mean_precision": float(search.cv_results_["mean_test_precision"][search.best_index_]),
+            "mean_f1": float(search.cv_results_["mean_test_f1"][search.best_index_]),
+            "mean_accuracy": float(search.cv_results_["mean_test_accuracy"][search.best_index_]),
+        }
+        for name, search in searches.items()
+    }
+    best_auc = max(item["mean_roc_auc"] for item in best_cv.values())
+    eligible = [
+        name for name, item in best_cv.items()
+        if item["mean_roc_auc"] >= best_auc - 0.01
+    ]
+    selected_name = sorted(
+        eligible,
+        key=lambda name: (
+            -round(best_cv[name]["mean_recall"], 12),
+            -round(best_cv[name]["mean_f1"], 12),
+            MODEL_ORDER[name],
+        ),
+    )[0]
+    selected_search = searches[selected_name]
+    selection = {
+        "rule": "Among models with mean CV ROC-AUC within 0.01 of the highest, maximize mean CV malignant recall; break ties by F1, then Logistic Regression, SVM, Random Forest.",
+        "best_mean_cv_roc_auc": best_auc,
+        "eligibility_threshold": best_auc - 0.01,
+        "eligible_models": eligible,
+        "selected_model": selected_name,
+        "selected_best_parameters": selected_search.best_params_,
+        "selected_cv_metrics": best_cv[selected_name],
+    }
+
+    # The holdout is first accessed here, after tuning and selection are complete.
+    evaluations = {}
+    for model_name, search in searches.items():
+        results = evaluate_test_set(search.best_estimator_, X_test, y_test, malignant_label, benign_label)
+        evaluations[model_name] = results
+
+    save_comparison_plots(evaluations)
+    write_demo_cases(
+        dataset, X_test, y_test, malignant_label, benign_label, selected_search.best_estimator_
+    )
+
+    train_ranges = {
+        key: {"min": float(X_train[:, column].min()), "max": float(X_train[:, column].max())}
+        for column, key in enumerate(input_keys)
+    }
+    selected_bundle = {
+        "model": selected_search.best_estimator_,
+        "model_name": selected_name,
         "input_features": feature_names,
-        "input_keys": [app_input_key(name) for name in feature_names],
+        "input_keys": input_keys,
         "target_names": list(dataset.target_names),
         "positive_class": "malignant",
-        "dataset": metrics["dataset"],
+        "positive_class_label": malignant_label,
+        "training_ranges": train_ranges,
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+        "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
+        "best_parameters": selected_search.best_params_,
+        "cv_metrics": best_cv[selected_name],
         "scikit_learn_version": sklearn.__version__,
-        "evaluation": metrics,
     }
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(selected_bundle, MODEL_PATH)
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(bundle, args.output)
-    metrics_path = args.output.with_suffix(".metrics.json")
-    metrics_path.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    test_json = {}
+    for model_name, results in evaluations.items():
+        test_json[model_name] = {
+            key: value for key, value in results.items()
+            if key not in {"malignant_scores", "malignant_truth", "predictions"}
+        }
+    evidence = {
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+        "observations": int(len(y)),
+        "training_observations": int(len(train_indices)),
+        "test_observations": int(len(test_indices)),
+        "positive_class": "malignant",
+        "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
+        "cross_validation": {
+            "folds": 5,
+            "shuffle": True,
+            "random_state": SEED,
+            "selection_refit_metric": "ROC-AUC (malignant positive)",
+        },
+        "all_cv_parameter_combinations": cv_records,
+        "best_cv_results_by_model": best_cv,
+        "selection_decision": selection,
+        "test_results": test_json,
+        "saved_model": str(MODEL_PATH),
+        "plots": {"roc_curves": str(ROC_PLOT_PATH), "confusion_matrices": str(CONFUSION_PLOT_PATH)},
+        "demo_cases": str(DEMO_PATH),
+        "library_versions": {
+            "python": platform.python_version(),
+            "scikit_learn": sklearn.__version__,
+            "streamlit": version("streamlit"),
+            "numpy": np.__version__,
+            "pandas": pd.__version__,
+            "joblib": joblib.__version__,
+            "matplotlib": matplotlib.__version__,
+        },
+        "warning": "Educational prototype results on a small public dataset do not establish clinical performance.",
+    }
+    EVIDENCE_PATH.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
-    print("Random Forest training complete.")
-    print(f"Dataset: {metrics['dataset']}")
-    print(f"Holdout accuracy: {metrics['accuracy']:.3f}")
-    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.3f}")
-    print(f"Malignant sensitivity: {metrics['malignant_recall_sensitivity']:.3f}")
-    print(f"Benign specificity: {metrics['benign_recall_specificity']:.3f}")
-    print(f"Malignant ROC AUC: {metrics['malignant_roc_auc']:.3f}")
-    print("Confusion matrix (rows: actual, columns: predicted; malignant, benign):")
-    print(matrix)
-    print(f"Model bundle: {args.output}")
-    print(f"Evaluation metrics: {metrics_path}")
+    cv_frame = pd.DataFrame(cv_records)
+    print("\nFull cross-validation results (all grid combinations):")
+    print(cv_frame.to_string(index=False))
+    print("\nBest CV metrics and parameters by model:")
+    print(pd.DataFrame(best_cv).T.to_string())
+    print("\nTest-set results (malignant positive):")
+    print(pd.DataFrame(test_json).T.to_string())
+    for model_name, results in test_json.items():
+        print(f"\n{model_name} confusion matrix (actual/predicted; malignant, benign):")
+        print(np.asarray(results["confusion_matrix"]))
+    print(f"\nSelected model: {selected_name}")
+    print(f"Selection decision: {selection}")
+    print(f"Model bundle: {MODEL_PATH}")
+    print(f"Evidence JSON: {EVIDENCE_PATH}")
+    print(f"ROC curves: {ROC_PLOT_PATH}")
+    print(f"Confusion matrices: {CONFUSION_PLOT_PATH}")
+    print(f"Demo cases from held-out test rows: {DEMO_PATH}")
     print("WARNING: This educational model is not clinically validated.")
 
 

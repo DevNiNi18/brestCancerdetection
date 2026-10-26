@@ -140,4 +140,4 @@ The application only loads `models/breast_cancer_model.joblib`. It validates the
 - The bundled dataset is small and cannot establish clinical validity or population-level reliability.
 - Model probabilities are not calibrated patient-risk estimates.
 - The interface does not provide diagnosis, treatment advice, patient accounts, storage, or history.
-- Demo values are randomized perturbations of one dataset example, not the held-out demo cases and not clinical cases.
+- Demo values alternate between small randomized perturbations of one benign and one malignant training-split example. They are not the held-out demo cases or clinical cases.

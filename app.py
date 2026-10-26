@@ -4,12 +4,16 @@ The page collects 30 cell nucleus measurements, sends them to the prediction ser
 (server.py), shows the model's answer, and lets a doctor review that answer. The page
 never loads the model itself: predictions, reviews, and retraining all happen on the server.
 
+Only verified clinicians can use it: the page first asks them to sign in, and sends the
+server's sign-in token with every request. Accounts are created with manage_users.py.
+
 Streamlit reruns this whole script from top to bottom every time someone clicks or types,
 so anything that must survive between reruns is kept in `st.session_state`.
 """
 
 from __future__ import annotations
 
+import html
 import json
 import math
 import os
@@ -63,12 +67,70 @@ REQUEST_TIMEOUT = 10
 DEMO_CASES_PATH = Path(__file__).resolve().parent / "demo_cases.json"
 
 
+def auth_headers() -> dict:
+    """The header that proves to the server who is signed in."""
+    return {"Authorization": f"Bearer {st.session_state['auth']['token']}"}
+
+
 @st.cache_data(ttl=3, show_spinner=False)
-def fetch_model_info() -> dict:
-    """Ask the server which model is loaded. Cached briefly so each rerun does not call the server."""
-    response = requests.get(f"{API_URL}/model", timeout=REQUEST_TIMEOUT)
+def fetch_model_info(token: str) -> dict:
+    """Ask the server which model is loaded. Cached briefly so each rerun does not call the server.
+
+    The token is a parameter so that each sign-in gets its own cached answer.
+    """
+    response = requests.get(f"{API_URL}/model", headers={"Authorization": f"Bearer {token}"}, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
+
+
+def is_unauthorized(error: Exception) -> bool:
+    """Return True if the server refused a request because the sign-in is missing or has expired."""
+    return isinstance(error, requests.HTTPError) and error.response is not None and error.response.status_code == 401
+
+
+def forget_session(notice: str | None = None) -> None:
+    """Forget the sign-in and everything entered, so the next person at this computer starts fresh.
+
+    The notice, if given, is shown on the sign-in page.
+    """
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    if notice:
+        st.session_state["login_notice"] = notice
+
+
+def log_in() -> None:
+    """Send the sign-in form to the server. Runs as the form's callback, before the page reruns."""
+    email = st.session_state.get("login_email", "").strip()
+    password = st.session_state.get("login_password", "")
+    # Never keep the password in the session longer than needed.
+    st.session_state["login_password"] = ""
+    st.session_state.pop("login_notice", None)
+    if not email or not password:
+        st.session_state["login_error"] = "Enter your email and password."
+        return
+    try:
+        response = requests.post(
+            f"{API_URL}/auth/login", json={"email": email, "password": password}, timeout=REQUEST_TIMEOUT
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        if is_unauthorized(error):
+            st.session_state["login_error"] = api_error_message(error)
+        else:
+            st.session_state["login_error"] = f"The prediction server at {API_URL} could not be reached: {api_error_message(error)}"
+        return
+    st.session_state.pop("login_error", None)
+    st.session_state["auth"] = response.json()
+
+
+def log_out() -> None:
+    """End the session on the server, then forget it here. Runs as the Sign out button's callback."""
+    try:
+        requests.post(f"{API_URL}/auth/logout", headers=auth_headers(), timeout=REQUEST_TIMEOUT)
+    except requests.RequestException:
+        pass  # The session still expires on the server by itself.
+    forget_session("You have signed out.")
 
 
 def api_error_message(error: Exception) -> str:
@@ -162,10 +224,14 @@ def submit_review(prediction_id: int) -> None:
         response = requests.post(
             f"{API_URL}/predictions/{prediction_id}/review",
             json={"prediction_correct": bool(st.session_state.get(f"review_correct_{prediction_id}", False))},
+            headers=auth_headers(),
             timeout=REQUEST_TIMEOUT,
         )
         response.raise_for_status()
     except requests.RequestException as error:
+        if is_unauthorized(error):
+            forget_session("Your session has expired, so the review was not saved. Sign in again.")
+            return
         prediction["review_error"] = api_error_message(error)
         return
     # Store the server's reply; the review section shows it when the page is redrawn.
@@ -250,6 +316,12 @@ st.markdown(
       .step-helper {color:#71809c;font-size:.78rem;align-self:center;text-align:right;padding-right:.5rem;}
       .st-key-feature_grid [data-testid="stHorizontalBlock"] {flex-wrap:wrap;gap:.8rem!important;}
       .st-key-feature_grid [data-testid="column"] {flex:1 1 calc(20% - .8rem)!important;min-width:145px;}
+      .login-heading {text-align:center;margin:3.5rem 0 1.4rem;}
+      .login-heading .page-subtitle {max-width:28rem;margin-left:auto;margin-right:auto;}
+      .st-key-login_card {padding-bottom:1.2rem;}
+      .st-key-login_card div[data-testid="stFormSubmitButton"] > button {min-height:3rem;border-radius:11px;font-weight:650;}
+      .signed-in {color:#53627c;font-size:.86rem;text-align:right;padding-top:.7rem;}
+      .signed-in strong {color:#17294b;}
       @media(max-width:900px){.block-container{padding:2rem 1.2rem}.page-title{font-size:1.85rem}.progress-summary{width:14rem;flex-basis:14rem}}
       @media(max-width:900px){.st-key-feature_grid [data-testid="column"]{flex-basis:calc(33.333% - .8rem)!important;}}
       @media(max-width:650px){.block-container{padding:1.5rem .8rem 2rem}.page-heading{align-items:flex-start;flex-direction:column;gap:1rem}.progress-summary{width:100%;flex-basis:auto}.page-title{font-size:1.65rem}.st-key-measurement_stepper div.stButton > button{min-height:5rem;padding:.5rem;font-size:.8rem}.st-key-feature_grid [data-testid="column"]{flex-basis:calc(50% - .8rem)!important;min-width:120px}.score-row{flex-direction:column}}
@@ -258,14 +330,44 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---- Sign-in ----
+# Until a verified clinician signs in, show only the sign-in form. st.stop() ends this run
+# of the script there, so nothing below it (the form, predictions, reviews) is drawn.
+if "auth" not in st.session_state:
+    st.markdown(
+        '<div class="login-heading"><div class="eyebrow">CLINICIAN ACCESS</div>'
+        '<h1 class="page-title">Sign in</h1>'
+        '<p class="page-subtitle">This tool is restricted to verified clinicians. '
+        'Ask your administrator for an account if you do not have one.</p></div>',
+        unsafe_allow_html=True,
+    )
+    _, login_column, _ = st.columns([1, 1.1, 1])
+    with login_column:
+        with st.container(border=True, key="login_card"):
+            if st.session_state.get("login_notice"):
+                st.info(st.session_state["login_notice"])
+            with st.form("login_form", border=False):
+                st.text_input("Email", key="login_email", autocomplete="email")
+                st.text_input("Password", type="password", key="login_password", autocomplete="current-password")
+                st.form_submit_button("Sign in", type="primary", on_click=log_in, use_container_width=True)
+            if st.session_state.get("login_error"):
+                st.error(st.session_state["login_error"])
+    st.stop()
+
+signed_in_user = st.session_state["auth"]["user"]
+
 # ---- Server connection ----
 # Ask the server which model is loaded. If the server is down, the page still loads,
 # but predictions are disabled and an error explains how to start the server.
 model_info = None
 server_error = None
 try:
-    model_info = fetch_model_info()
+    model_info = fetch_model_info(st.session_state["auth"]["token"])
 except requests.RequestException as error:  # Keep the input form usable if the server is down.
+    if is_unauthorized(error):
+        # The session expired, or the account was disabled: go back to the sign-in page.
+        forget_session("Your session has ended. Sign in again.")
+        st.rerun()
     server_error = api_error_message(error)
 
 # Text and colour of the status badge under the page title.
@@ -298,6 +400,15 @@ except (OSError, ValueError, json.JSONDecodeError) as error:
 # Title, model status badge, and a progress bar showing how many of the 30 fields are filled.
 measurement_values = st.session_state["measurement_values"]
 filled_count = sum(1 for value in measurement_values.values() if value is not None)
+# Who is signed in, with a Sign out button, above the title.
+_, signed_in_column, sign_out_column = st.columns([6, 3, 1])
+with signed_in_column:
+    st.markdown(
+        f'<div class="signed-in">Signed in as <strong>{html.escape(signed_in_user["full_name"])}</strong></div>',
+        unsafe_allow_html=True,
+    )
+with sign_out_column:
+    st.button("Sign out", on_click=log_out, use_container_width=True)
 st.markdown(
     f"""<div class="page-heading">
       <div><div class="eyebrow">PREDICTION</div><h1 class="page-title">Enter diagnostic measurements</h1>
@@ -450,10 +561,14 @@ if prediction_clicked:
             response = requests.post(
                 f"{API_URL}/predictions",
                 json={"features": {key: float(value) for key, value in input_values.items()}},
+                headers=auth_headers(),
                 timeout=REQUEST_TIMEOUT,
             )
             response.raise_for_status()
         except requests.RequestException as error:
+            if is_unauthorized(error):
+                forget_session("Your session has ended. Sign in again.")
+                st.rerun()
             st.error(f"The prediction request failed: {api_error_message(error)}")
         else:
             # Keep the result in the session so it stays visible while the doctor uses the review controls.

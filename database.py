@@ -1,13 +1,15 @@
-"""SQLite storage for WDBC records, app predictions, doctor reviews, and model versions.
+"""SQLite storage for WDBC records, app predictions, doctor reviews, model versions, and accounts.
 
 The original WDBC split is seeded once. Doctor-reviewed cases are added to the
 training split only, so the held-out test split stays fixed across retraining.
 
-The database is one file, data/breast_cancer.db, with four tables:
+The database is one file, data/breast_cancer.db, with six tables:
   records         training and test data (WDBC records and doctor-reviewed cases)
   model_versions  one row per training run, with its test scores
   predictions     every answer the app gives, with its measurements and model version
-  reviews         a doctor's verdict on a prediction, and the training record it created
+  reviews         a doctor's verdict on a prediction, who gave it, and the training record it created
+  users           certified clinicians who may sign in (created with manage_users.py)
+  sessions        signed-in tokens, stored as hashes, each with an expiry time
 
 This file holds the schema (SCHEMA below) and small functions that read and write
 these tables. server.py and train_model.py use these functions instead of writing SQL.
@@ -25,12 +27,21 @@ import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 
+import auth
+
 
 # Where the database file lives, and the settings for the one-time 80/20 train/test split.
 DATABASE_PATH = Path(__file__).resolve().parent / "data" / "breast_cancer.db"
 DATASET_NAME = "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)"
 SEED = 42
 TEST_SIZE = 0.20
+
+# The account created on a database with no accounts, so the app can be signed in to straight away.
+# Its password is public, so change it with `python manage_users.py set-password` before real use.
+DEMO_USER_EMAIL = "doctor@gmail.com"
+DEMO_USER_PASSWORD = "password123"
+DEMO_USER_NAME = "Demo Doctor"
+DEMO_USER_LICENCE = "DEMO-0001"
 
 
 def app_input_key(dataset_feature_name: str) -> str:
@@ -68,6 +79,8 @@ _LABEL_CHECK = "CHECK ({column} IN ('malignant', 'benign'))"
 #   predictions.model_version_id -> the model that made the prediction
 #   reviews.prediction_id        -> the prediction being reviewed (UNIQUE: one review each)
 #   reviews.record_id            -> the training record created from the review, if any
+#   reviews.reviewer_id          -> the clinician who submitted the review
+#   sessions.user_id             -> the clinician who signed in
 SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS records (
     id INTEGER PRIMARY KEY,
@@ -109,7 +122,25 @@ CREATE TABLE IF NOT EXISTS reviews (
     prediction_correct INTEGER NOT NULL CHECK (prediction_correct IN (0, 1)),
     confirmed_label TEXT NOT NULL {_LABEL_CHECK.format(column="confirmed_label")},
     record_id INTEGER REFERENCES records(id),
-    excluded_reason TEXT
+    excluded_reason TEXT,
+    reviewer_id INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    full_name TEXT NOT NULL,
+    licence_number TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
 );
 """
 
@@ -141,9 +172,14 @@ def connect(path: Path = DATABASE_PATH) -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
-    """Create any tables that do not exist yet."""
+    """Create any tables that do not exist yet, and add columns that older databases lack."""
     with connect() as connection:
         connection.executescript(SCHEMA)
+        # "CREATE TABLE IF NOT EXISTS" leaves an existing table unchanged, so a database made
+        # before accounts existed needs the reviewer column added. Older reviews keep it empty.
+        review_columns = {row["name"] for row in connection.execute("PRAGMA table_info(reviews)")}
+        if "reviewer_id" not in review_columns:
+            connection.execute("ALTER TABLE reviews ADD COLUMN reviewer_id INTEGER REFERENCES users(id)")
 
 
 def _insert(connection: sqlite3.Connection, table: str, fields: dict, values: list[float]) -> int:
@@ -180,6 +216,18 @@ def seed_wdbc_records() -> bool:
                     "label": TARGET_NAMES[_DATASET.target[index]],
                     "created_at": created_at,
                 }, _DATASET.data[index])
+        return True
+
+
+def seed_demo_user() -> bool:
+    """Create the demo clinician account if there are no accounts at all. Returns True if it was added.
+
+    Checking for any account, not just this one, means a disabled or deleted demo account is not recreated.
+    """
+    with connect() as connection:
+        if count_users(connection):
+            return False
+        insert_user(connection, DEMO_USER_EMAIL, DEMO_USER_NAME, DEMO_USER_LICENCE, auth.hash_password(DEMO_USER_PASSWORD))
         return True
 
 
@@ -239,16 +287,17 @@ def insert_review_record(connection, label: str, values) -> int:
     }, values)
 
 
-def insert_review(connection, prediction_id, prediction_correct, confirmed_label, record_id, excluded_reason) -> int:
+def insert_review(connection, prediction_id, prediction_correct, confirmed_label, record_id, excluded_reason,
+                  reviewer_id) -> int:
     """Save a doctor's review. Returns its id.
 
     record_id is the training record the review created. It is None when the case was not used
-    for training, and excluded_reason then says why.
+    for training, and excluded_reason then says why. reviewer_id is the signed-in clinician.
     """
     cursor = connection.execute(
-        "INSERT INTO reviews (prediction_id, reviewed_at, prediction_correct, confirmed_label, record_id, excluded_reason)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        (prediction_id, utc_now(), int(prediction_correct), confirmed_label, record_id, excluded_reason),
+        "INSERT INTO reviews (prediction_id, reviewed_at, prediction_correct, confirmed_label, record_id,"
+        " excluded_reason, reviewer_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (prediction_id, utc_now(), int(prediction_correct), confirmed_label, record_id, excluded_reason, reviewer_id),
     )
     return int(cursor.lastrowid)
 
@@ -271,3 +320,71 @@ def insert_model_version(connection, training_records, review_records, best_c, c
 def latest_model_version(connection: sqlite3.Connection) -> Optional[sqlite3.Row]:
     """Return the newest model version row, or None before the first training run."""
     return connection.execute("SELECT * FROM model_versions ORDER BY id DESC LIMIT 1").fetchone()
+
+
+def insert_user(connection, email, full_name, licence_number, password_hash) -> int:
+    """Create a clinician account. Returns its id. Raises sqlite3.IntegrityError if the email is taken."""
+    cursor = connection.execute(
+        "INSERT INTO users (email, full_name, licence_number, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+        (email, full_name, licence_number, password_hash, utc_now()),
+    )
+    return int(cursor.lastrowid)
+
+
+def get_user_by_email(connection: sqlite3.Connection, email: str) -> Optional[sqlite3.Row]:
+    """Return one account (ignoring case in the email), or None if there is no such account."""
+    return connection.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
+
+def list_users(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Return every account, oldest first."""
+    return connection.execute("SELECT * FROM users ORDER BY id").fetchall()
+
+
+def count_users(connection: sqlite3.Connection) -> int:
+    """Return how many accounts exist, including disabled ones."""
+    return int(connection.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+
+
+def update_user(connection: sqlite3.Connection, email: str, **fields) -> bool:
+    """Change an account's password_hash or active flag. Returns False if there is no such account."""
+    allowed = {"password_hash", "active"}
+    if not fields or set(fields) - allowed:
+        raise ValueError(f"Only these fields can be updated: {sorted(allowed)}")
+    assignments = ", ".join(f"{column} = ?" for column in fields)
+    cursor = connection.execute(
+        f"UPDATE users SET {assignments} WHERE email = ?", (*fields.values(), email)
+    )
+    return cursor.rowcount > 0
+
+
+def delete_user_sessions(connection: sqlite3.Connection, email: str) -> None:
+    """Sign an account out everywhere, e.g. after it is disabled or its password changes."""
+    connection.execute(
+        "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = ?)", (email,)
+    )
+
+
+def insert_session(connection, token_hash: str, user_id: int, expires_at: str) -> None:
+    """Record a sign-in. Expired sessions are cleared out at the same time."""
+    now = utc_now()
+    connection.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
+    connection.execute(
+        "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+        (token_hash, user_id, now, expires_at),
+    )
+
+
+def get_session_user(connection: sqlite3.Connection, token_hash: str) -> Optional[sqlite3.Row]:
+    """Return the active account signed in with this token, or None if the token is unknown or expired."""
+    # Timestamps are all UTC text in one format, so comparing them as text compares the times.
+    return connection.execute(
+        "SELECT users.* FROM sessions JOIN users ON users.id = sessions.user_id"
+        " WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND users.active = 1",
+        (token_hash, utc_now()),
+    ).fetchone()
+
+
+def delete_session(connection: sqlite3.Connection, token_hash: str) -> None:
+    """Sign out one token."""
+    connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))

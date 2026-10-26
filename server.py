@@ -4,8 +4,14 @@ Every prediction is saved to the SQLite database. When a doctor reviews one, the
 confirmed case joins the training split and the model retrains in the background.
 Start it with `uvicorn server:app --port 8000`.
 
+Only certified clinicians can use it. They sign in with an account made by
+manage_users.py, and send the token they get back as "Authorization: Bearer <token>".
+
 Endpoints (interactive docs at http://127.0.0.1:8000/docs while it runs):
-  GET  /health                         is the server up?
+  GET  /health                         is the server up?                       (no sign-in needed)
+  POST /auth/login                     sign in with email and password         (no sign-in needed)
+  POST /auth/logout                    end this sign-in
+  GET  /auth/me                        who is signed in
   GET  /model                          which model version is loaded, and its scores
   POST /predictions                    predict from 30 measurements and save the prediction
   POST /predictions/{id}/review        save a doctor's verdict and trigger retraining
@@ -13,14 +19,17 @@ Endpoints (interactive docs at http://127.0.0.1:8000/docs while it runs):
 
 import logging
 import math
+import sqlite3
 import threading
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
 import joblib
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+import auth
 import database
 import train_model
 
@@ -57,6 +66,24 @@ class ReviewResponse(BaseModel):
     added_to_training: bool
     excluded_reason: Optional[str]
     retraining_queued: bool
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """The signed-in clinician. The licence number and password hash are never sent back."""
+    email: str
+    full_name: str
+
+
+class LoginResponse(BaseModel):
+    """The token to send with every later request, and when it stops working."""
+    token: str
+    expires_at: str
+    user: UserResponse
 
 
 class ModelStore:
@@ -124,6 +151,12 @@ def prepare_model() -> None:
         logger.info("Training a model from the database records...")
         train_model.train_and_save()
     store.load()
+    if database.seed_demo_user():
+        logger.warning(
+            "Created the demo clinician account %s (password %s). Change its password with "
+            "`python manage_users.py set-password %s` before real use.",
+            database.DEMO_USER_EMAIL, database.DEMO_USER_PASSWORD, database.DEMO_USER_EMAIL,
+        )
 
 
 @asynccontextmanager
@@ -144,13 +177,71 @@ def current_bundle() -> dict:
     return store.bundle
 
 
+# Reads the "Authorization: Bearer <token>" header. auto_error=False lets current_user()
+# answer a missing header with the same 401 message as a wrong token.
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)) -> sqlite3.Row:
+    """Return the signed-in clinician, or answer 401 (not signed in). Endpoints that list this
+    as a dependency cannot be used without a valid, unexpired token from an active account."""
+    user = None
+    if credentials is not None:
+        with database.connect() as connection:
+            user = database.get_session_user(connection, auth.token_hash(credentials.credentials))
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in as a certified clinician to use this service.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
 @app.get("/health")
 def health() -> dict:
     """Simple check that the server is running. ./run uses it to know when to start the app."""
     return {"status": "ok"}
 
 
-@app.get("/model")
+@app.post("/auth/login", response_model=LoginResponse)
+def login(request: LoginRequest) -> LoginResponse:
+    """Check an email and password, and start a session for an active account."""
+    with database.connect() as connection:
+        user = database.get_user_by_email(connection, request.email.strip())
+        # Check a password even for unknown emails, so both kinds of failure take as long.
+        password_ok = auth.verify_password(request.password, user["password_hash"] if user else auth.DUMMY_HASH)
+        # One message for every failure, so it does not reveal which emails have accounts.
+        if user is None or not password_ok or not user["active"]:
+            raise HTTPException(status_code=401, detail="The email or password is incorrect, or the account is disabled.")
+        token = auth.new_token()
+        expires_at = auth.session_expiry()
+        database.insert_session(connection, auth.token_hash(token), user["id"], expires_at)
+    logger.info("Clinician %s signed in.", user["email"])
+    return LoginResponse(
+        token=token,
+        expires_at=expires_at,
+        user=UserResponse(email=user["email"], full_name=user["full_name"]),
+    )
+
+
+@app.post("/auth/logout", status_code=204)
+def logout(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    _: sqlite3.Row = Depends(current_user),
+) -> None:
+    """End the session for the token sent with this request."""
+    with database.connect() as connection:
+        database.delete_session(connection, auth.token_hash(credentials.credentials))
+
+
+@app.get("/auth/me", response_model=UserResponse)
+def me(user: sqlite3.Row = Depends(current_user)) -> UserResponse:
+    """Return who is signed in with this token."""
+    return UserResponse(email=user["email"], full_name=user["full_name"])
+
+
+@app.get("/model", dependencies=[Depends(current_user)])
 def model_info() -> dict:
     """Describe the loaded model: version, feature names, training size, test scores, and retraining status."""
     bundle = current_bundle()
@@ -170,7 +261,7 @@ def model_info() -> dict:
     }
 
 
-@app.post("/predictions", response_model=PredictionResponse)
+@app.post("/predictions", response_model=PredictionResponse, dependencies=[Depends(current_user)])
 def create_prediction(request: PredictionRequest) -> PredictionResponse:
     """Predict benign or malignant from 30 measurements, and save the prediction to the database."""
     bundle = current_bundle()
@@ -214,7 +305,9 @@ def create_prediction(request: PredictionRequest) -> PredictionResponse:
 
 
 @app.post("/predictions/{prediction_id}/review", response_model=ReviewResponse)
-def review_prediction(prediction_id: int, request: ReviewRequest) -> ReviewResponse:
+def review_prediction(
+    prediction_id: int, request: ReviewRequest, user: sqlite3.Row = Depends(current_user)
+) -> ReviewResponse:
     """Save a doctor's verdict on a prediction and, if the case is new, add it to training and retrain."""
     with database.connect() as connection:
         # Reject unknown predictions (404) and second reviews of the same prediction (409).
@@ -244,7 +337,8 @@ def review_prediction(prediction_id: int, request: ReviewRequest) -> ReviewRespo
             record_id = database.insert_review_record(connection, confirmed_label, values)
 
         review_id = database.insert_review(
-            connection, prediction_id, request.prediction_correct, confirmed_label, record_id, excluded_reason
+            connection, prediction_id, request.prediction_correct, confirmed_label, record_id, excluded_reason,
+            user["id"],
         )
 
     # Retrain only if the training data actually changed. The retrain runs in the background,

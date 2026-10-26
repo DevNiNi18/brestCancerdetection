@@ -51,6 +51,32 @@ Once the environment is set up, you can start both the server and the app from t
 
 ## Using the app
 
+### Signing in
+
+Only verified clinicians can use the app. It opens on a **Sign in** page, and the server refuses every request except `/health` and `/auth/login` without a valid sign-in. A sign-in lasts 8 hours, and **Sign out** ends it straight away and clears the form.
+
+There is no sign-up page: an administrator verifies a clinician, then creates their account from the project folder:
+
+```bash
+python manage_users.py add dr.obi@hospital.org   # asks for full name, licence number, and password
+python manage_users.py list
+python manage_users.py disable dr.obi@hospital.org
+python manage_users.py enable dr.obi@hospital.org
+python manage_users.py set-password dr.obi@hospital.org
+```
+
+Disabling an account or changing its password signs it out everywhere.
+
+When the server starts with no accounts at all, it creates a demo account so the app can be tried straight away:
+
+| Email | Password |
+| --- | --- |
+| `doctor@gmail.com` | `password123` |
+
+This password is public. Change it with `python manage_users.py set-password doctor@gmail.com`, or disable the account, before anyone else can reach the app.
+
+### Making a prediction
+
 The app collects 30 measurements in three sections: **Mean**, **Standard error**, and **Worst**. Each section has 10 measurements. Enter all 30 values and choose **Get prediction**. The app displays its predicted class and the **probability of malignancy** estimated by the model. The probability is not calibrated as an individual risk estimate.
 
 Choose **Load held-out demo case** to fill the form with one of six saved test examples. The app cycles through the examples. After you request a prediction, it displays the example's actual label beside the model's prediction. These examples are for demonstrating the app; they are not new clinical cases.
@@ -88,16 +114,18 @@ sqlite3 data/breast_cancer.db "SELECT id, trained_at, training_records, review_r
 
 ### The database
 
-The database file is `data/breast_cancer.db`. It has four tables:
+The database file is `data/breast_cancer.db`. It has six tables:
 
 | Table | What it holds |
 | --- | --- |
 | `records` | The training and test records: the 569 WDBC records and any doctor-reviewed cases, each with its 30 measurements, label, split, and source (`wdbc` or `review`). |
 | `predictions` | Every prediction the app makes: the measurements, predicted class, probability of malignancy, and model version. |
-| `reviews` | Each doctor review: whether the prediction was correct, the confirmed diagnosis, and either the training record it created or why it was not used for training. |
+| `reviews` | Each doctor review: whether the prediction was correct, the confirmed diagnosis, who submitted it, and either the training record it created or why it was not used for training. |
 | `model_versions` | One row per training run: how many records it used, how many came from reviews, and its test scores. |
+| `users` | Clinician accounts: email, full name, licence number, a salted PBKDF2 hash of the password (never the password itself), and whether the account is active. |
+| `sessions` | Current sign-ins: a SHA-256 hash of each sign-in token, the account, and when it expires. |
 
-The tables are linked: each prediction points to the model version that made it, each review points to its prediction, and a review that was used for training points to the record it created. The schema is the `SCHEMA` text in [`database.py`](database.py). To print it with all 30 measurement columns filled in, run `sqlite3 data/breast_cancer.db ".schema"`.
+The tables are linked: each prediction points to the model version that made it, each review points to its prediction and the clinician who submitted it, and a review that was used for training points to the record it created. The schema is the `SCHEMA` text in [`database.py`](database.py). To print it with all 30 measurement columns filled in, run `sqlite3 data/breast_cancer.db ".schema"`.
 
 You can open the file with any SQLite tool, for example `sqlite3 data/breast_cancer.db "SELECT * FROM reviews;"`. The database is not committed to git because it holds the app's saved predictions.
 
@@ -108,11 +136,14 @@ You can open the file with any SQLite tool, for example `sqlite3 data/breast_can
 | Endpoint | What it does |
 | --- | --- |
 | `GET /health` | Confirms the server is running. `./run` uses it to know when to start the app. |
+| `POST /auth/login` | Takes an email and password, and returns a sign-in token and its expiry time. |
+| `POST /auth/logout` | Ends the sign-in for the token sent with the request. |
+| `GET /auth/me` | Returns the email and name of the signed-in clinician. |
 | `GET /model` | Describes the loaded model: version, number of training records, test scores, and whether it is retraining. |
 | `POST /predictions` | Takes the 30 measurements, returns the predicted class, probability of malignancy, and any out-of-range warnings, and saves the prediction. |
 | `POST /predictions/{id}/review` | Saves the doctor's verdict on a prediction, adds the case to training if it is new, and starts a retrain. |
 
-The server rejects requests with missing, extra, negative, or non-numeric measurements (error 422), reviews of unknown predictions (404), and second reviews of the same prediction (409). When it starts, it creates and seeds the database if needed, and trains a model if the saved model file does not match the latest version in the database.
+Every endpoint except `/health` and `/auth/login` needs the header `Authorization: Bearer <token>`, and answers 401 without a valid token. The server rejects requests with missing, extra, negative, or non-numeric measurements (error 422), reviews of unknown predictions (404), and second reviews of the same prediction (409). When it starts, it creates and seeds the database if needed, and trains a model if the saved model file does not match the latest version in the database.
 
 ![Diagram showing the WDBC dataset split into training and test sets, model tuning, test evaluation, and the saved model being used by the app.](project_workflow.png)
 
@@ -180,7 +211,9 @@ The training and test JSON records include a `source_index`, a `features` object
 | --- | --- |
 | [`app.py`](app.py) | Runs the Streamlit interface, validates inputs, sends them to the server, and displays predictions and the doctor review section. It also loads the held-out examples from `demo_cases.json`. |
 | [`server.py`](server.py) | FastAPI server that makes predictions, saves predictions and reviews to the database, and retrains the model after each review. |
-| [`database.py`](database.py) | Creates the SQLite database, loads the WDBC split into it, and reads and writes its tables. |
+| [`database.py`](database.py) | Creates the SQLite database, loads the WDBC split and the demo account into it, and reads and writes its tables. |
+| [`auth.py`](auth.py) | Hashes and checks passwords, and creates sign-in tokens. |
+| [`manage_users.py`](manage_users.py) | Command-line tool for creating, listing, disabling, and re-enabling clinician accounts, and changing their passwords. |
 | [`train_model.py`](train_model.py) | Trains the Logistic Regression model from the database's training records, evaluates it on the test records, and writes model, data, and report files. |
 | [`requirements.txt`](requirements.txt) | Lists the Python packages needed by the project. |
 | [`.python-version`](.python-version) | Selects Python 3.9.6 for tools that recognize this file. |
@@ -216,7 +249,9 @@ Every file is commented for readers new to the project. A good order is:
 - The dataset is a small public benchmark and cannot establish clinical validity.
 - The probability shown by the app is a model output, not a calibrated patient risk estimate.
 - The six demo cases come from the held-out test set and are examples for demonstrating predictions, not a new independent evaluation.
-- The app has no patient or doctor accounts, so anyone using it can submit a review, and the database does not record who reviewed a case.
+- Clinician accounts are checked only by the administrator who creates them; the app does not verify licence numbers itself. Reviews made before accounts were added have no recorded reviewer.
+- The server has no limit on failed sign-in attempts, and serves plain HTTP. Put it behind HTTPS before using it on a network.
+- Refreshing the browser page signs the clinician out, because the app keeps the sign-in only in the page's session.
 - The model retrains after every review and the new version is used straight away, even if its test scores are lower. A single wrong review can make the model worse; check the test scores in the `model_versions` table after retraining.
 - The data quality report only covers the original 569 records. Reviewed cases are checked for missing, negative, and non-numeric values, but not for duplicates of each other or unusual values.
 - The workflow diagram (Figure 1) predates the database, server, and doctor review, so it does not show them.

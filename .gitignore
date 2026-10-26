@@ -9,3 +9,7 @@ dist/
 .idea/
 .vscode/
 node_modules
+
+# Local database of predictions and doctor reviews
+data/
+*.joblib.tmp

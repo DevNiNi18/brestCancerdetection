@@ -33,8 +33,8 @@
       "worst fractal dimension": 0.07083
     },
     "true_label": "benign",
-    "selected_model_prediction": "benign",
-    "selected_model_malignant_probability": 1.13351672246e-05
+    "model_prediction": "benign",
+    "model_malignant_probability": 1.1335167224624243e-05
   },
   {
     "features": {
@@ -70,8 +70,8 @@
       "worst fractal dimension": 0.06469
     },
     "true_label": "benign",
-    "selected_model_prediction": "benign",
-    "selected_model_malignant_probability": 0.466491462986
+    "model_prediction": "benign",
+    "model_malignant_probability": 0.46649146298575594
   },
   {
     "features": {
@@ -107,8 +107,8 @@
       "worst fractal dimension": 0.06925
     },
     "true_label": "benign",
-    "selected_model_prediction": "benign",
-    "selected_model_malignant_probability": 0.00783960162728
+    "model_prediction": "benign",
+    "model_malignant_probability": 0.007839601627279258
   },
   {
     "features": {
@@ -144,8 +144,8 @@
       "worst fractal dimension": 0.1005
     },
     "true_label": "malignant",
-    "selected_model_prediction": "malignant",
-    "selected_model_malignant_probability": 0.999999941118
+    "model_prediction": "malignant",
+    "model_malignant_probability": 0.9999999411175814
   },
   {
     "features": {
@@ -181,8 +181,8 @@
       "worst fractal dimension": 0.1183
     },
     "true_label": "malignant",
-    "selected_model_prediction": "malignant",
-    "selected_model_malignant_probability": 0.993589175379
+    "model_prediction": "malignant",
+    "model_malignant_probability": 0.9935891753788668
   },
   {
     "features": {
@@ -218,7 +218,7 @@
       "worst fractal dimension": 0.07115
     },
     "true_label": "malignant",
-    "selected_model_prediction": "malignant",
-    "selected_model_malignant_probability": 0.999999999347
+    "model_prediction": "malignant",
+    "model_malignant_probability": 0.9999999993475
   }
 ]

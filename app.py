@@ -1,13 +1,25 @@
+"""Streamlit web page for the breast cancer prediction prototype.
+
+The page collects 30 cell nucleus measurements, sends them to the prediction server
+(server.py), shows the model's answer, and lets a doctor review that answer. The page
+never loads the model itself: predictions, reviews, and retraining all happen on the server.
+
+Streamlit reruns this whole script from top to bottom every time someone clicks or types,
+so anything that must survive between reruns is kept in `st.session_state`.
+"""
+
 from __future__ import annotations
 
 import json
 import math
+import os
 from pathlib import Path
 
-import joblib
+import requests
 import streamlit as st
 
 
+# The 10 measurements taken from each cell nucleus image: (form key, label, unit).
 FEATURES = [
     ("radius", "Radius", "dataset units"),
     ("texture", "Texture", "dataset units"),
@@ -21,6 +33,7 @@ FEATURES = [
     ("fractal_dimension", "Fractal dimension", "dataset units"),
 ]
 
+# Tooltip text shown for each measurement field.
 FEATURE_HELP = {
     "radius": "Average distance from the center of the cell nucleus to its boundary.",
     "texture": "Variation in gray-scale image values.",
@@ -34,24 +47,42 @@ FEATURE_HELP = {
     "fractal_dimension": "A measure of contour complexity.",
 }
 
+# Each measurement is reported three ways, giving 3 x 10 = 30 inputs: (key, label, description).
+# Form keys combine a group and a feature, e.g. "mean_radius" or "worst_concave_points".
 GROUPS = [
     ("mean", "Mean", "Average values across measured cell nuclei."),
     ("se", "Standard error", "Variation in each measurement across the sample."),
     ("worst", "Worst", "Largest or most irregular values for each feature."),
 ]
 
-MODEL_PATH = Path(__file__).resolve().parent / "models" / "breast_cancer_model.joblib"
+# Where the prediction server runs. Set BREAST_CANCER_API_URL to use a different address.
+API_URL = os.environ.get("BREAST_CANCER_API_URL", "http://127.0.0.1:8000")
+# Seconds to wait for the server before giving up.
+REQUEST_TIMEOUT = 10
+# Six real held-out test records used by the "Load held-out demo case" button.
 DEMO_CASES_PATH = Path(__file__).resolve().parent / "demo_cases.json"
 
 
-@st.cache_resource
-def load_model_bundle(model_path: str, modified_time: float):
-    """Load a locally trained model once, and refresh the cache if it changes."""
-    del modified_time  # Included as a cache key so retraining reloads the bundle.
-    return joblib.load(model_path)
+@st.cache_data(ttl=3, show_spinner=False)
+def fetch_model_info() -> dict:
+    """Ask the server which model is loaded. Cached briefly so each rerun does not call the server."""
+    response = requests.get(f"{API_URL}/model", timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
+
+
+def api_error_message(error: Exception) -> str:
+    """Turn a failed server request into a readable message, using the server's "detail" text if there is one."""
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        try:
+            return str(error.response.json().get("detail", error.response.text))
+        except ValueError:
+            return error.response.text
+    return str(error)
 
 
 def clear_inputs() -> None:
+    """Reset the form: forget every measurement, the loaded demo case, and the last prediction."""
     st.session_state["measurement_values"] = {}
     for group_key, _, _ in GROUPS:
         for feature_key, _, _ in FEATURES:
@@ -60,16 +91,20 @@ def clear_inputs() -> None:
             st.session_state.pop(input_key, None)
     st.session_state["active_group"] = "mean"
     st.session_state.pop("active_demo_case", None)
+    st.session_state.pop("last_prediction", None)
 
 
 def persist_measurement(input_key: str, widget_key: str) -> None:
+    """Save one field's value when it changes, and drop the old result because it no longer matches the inputs."""
     values = dict(st.session_state.get("measurement_values", {}))
     values[input_key] = st.session_state.get(widget_key)
     st.session_state["measurement_values"] = values
     st.session_state.pop("active_demo_case", None)
+    st.session_state.pop("last_prediction", None)
 
 
 def is_valid_measurement(value) -> bool:
+    """Return True if the value is a real number of zero or more (not text, infinity, or NaN)."""
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -78,21 +113,27 @@ def is_valid_measurement(value) -> bool:
 
 
 def load_demo_input() -> None:
-    if not demo_cases or model_bundle is None:
+    """Fill the form with the next demo case, cycling through cases 1 to 6 and back to 1."""
+    if not demo_cases or model_info is None:
         return
+    # Move to the next case, wrapping back to the first after the last.
     case_index = (st.session_state.get("last_demo_case_index", -1) + 1) % len(demo_cases)
     case = demo_cases[case_index]
-    feature_to_key = dict(zip(model_bundle["input_features"], model_bundle["input_keys"]))
+    # Demo files use dataset names ("mean radius"); the form uses keys ("mean_radius").
+    feature_to_key = dict(zip(model_info["input_features"], model_info["input_keys"]))
     values = {
         feature_to_key[feature_name]: float(value)
         for feature_name, value in case["features"].items()
     }
     st.session_state["last_demo_case_index"] = case_index
+    # Remember which case was loaded so its real diagnosis can be shown next to the prediction.
     st.session_state["active_demo_case"] = {
         "number": case_index + 1,
         "true_label": case["true_label"],
     }
     st.session_state["measurement_values"] = values
+    st.session_state.pop("last_prediction", None)
+    # Put the values into the visible input boxes.
     for input_key, value in values.items():
         st.session_state[f"field_{input_key}"] = value
 
@@ -105,8 +146,39 @@ def load_demo_cases(path: Path) -> list:
         raise ValueError("The demo cases file must contain a non-empty JSON list.")
     return cases
 
+
+def submit_review(prediction_id: int) -> None:
+    """Send the doctor's verdict for one prediction to the server.
+
+    This runs as the Submit button's callback, before the page reruns, so the server's reply
+    is already stored when the page is redrawn.
+    """
+    prediction = st.session_state.get("last_prediction")
+    # Ignore the click if a different prediction is now on screen.
+    if not prediction or prediction["prediction_id"] != prediction_id:
+        return
+    try:
+        # The toggle is on (True) when the doctor says the AI prediction was correct.
+        response = requests.post(
+            f"{API_URL}/predictions/{prediction_id}/review",
+            json={"prediction_correct": bool(st.session_state.get(f"review_correct_{prediction_id}", False))},
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        prediction["review_error"] = api_error_message(error)
+        return
+    # Store the server's reply; the review section shows it when the page is redrawn.
+    prediction["review"] = response.json()
+    prediction.pop("review_error", None)
+    # Forget the cached model info so the header shows "retraining" straight away.
+    fetch_model_info.clear()
+
+# ---- Page setup ----
+# Browser tab title, tab icon, and full-width layout. This must be the first Streamlit command on the page.
 st.set_page_config(page_title="Breast Cancer Prediction Prototype", page_icon="✚", layout="wide")
 
+# Every measurement typed so far lives in st.session_state["measurement_values"].
 # Keep a durable copy separate from Streamlit's per-section widget state. Streamlit
 # removes the widget state for a section when its controls are no longer rendered.
 if "measurement_values" not in st.session_state:
@@ -117,6 +189,7 @@ if "measurement_values" not in st.session_state:
         if st.session_state.get(f"{group}_{feature}") is not None
     }
 
+# Custom CSS for the page's look: colours, cards, buttons, and layouts for smaller screens.
 st.markdown(
     """
     <style>
@@ -166,6 +239,10 @@ st.markdown(
       .result-footnote, .privacy-note {color:#71809c;font-size:.82rem;line-height:1.5;}
       .result-footnote {margin:.85rem 0 0;}
       .privacy-note {margin:1.2rem 0 0;}
+      .st-key-review_panel {margin-top:1rem;padding-bottom:1rem;}
+      .review-title {font-size:1.1rem;font-weight:800;color:#17294b;margin:0 0 .3rem;}
+      .review-description {color:#71809c;font-size:.88rem;line-height:1.5;margin:0 0 .6rem;}
+      .review-summary {color:#334155;font-size:.92rem;margin:.2rem 0 .7rem;}
       .model-status {display:inline-flex;align-items:center;gap:.4rem;border-radius:999px;padding:.35rem .65rem;font-size:.75rem;font-weight:700;margin-top:.65rem;}
       .model-status.ready {color:#14785f;background:#e8f7f1;border:1px solid #ccecdf;}
       .model-status.attention {color:#92580b;background:#fff5df;border:1px solid #f4dfac;}
@@ -181,42 +258,50 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-model_bundle = None
-model_load_error = None
-if MODEL_PATH.exists():
-    try:
-        model_bundle = load_model_bundle(str(MODEL_PATH), MODEL_PATH.stat().st_mtime)
-    except Exception as error:  # Keep the input form usable if the artifact is missing or incompatible.
-        model_load_error = str(error)
+# ---- Server connection ----
+# Ask the server which model is loaded. If the server is down, the page still loads,
+# but predictions are disabled and an error explains how to start the server.
+model_info = None
+server_error = None
+try:
+    model_info = fetch_model_info()
+except requests.RequestException as error:  # Keep the input form usable if the server is down.
+    server_error = api_error_message(error)
 
-if model_bundle is not None:
-    model_status = f"● {model_bundle.get('model_name', 'Selected model')} loaded"
+# Text and colour of the status badge under the page title.
+if model_info is not None:
+    model_status = (
+        f"● {model_info['model_name']} v{model_info['version']} loaded · "
+        f"{model_info['training_records']} training records ({model_info['review_records']} from doctor reviews)"
+    )
+    if model_info.get("retraining"):
+        model_status += " · retraining…"
     model_status_class = "ready"
-elif model_load_error:
-    model_status = "● Model needs attention"
-    model_status_class = "attention"
 else:
-    model_status = "● Train the model to begin"
-    model_status_class = "missing"
+    model_status = "● Prediction server not reachable"
+    model_status_class = "attention"
 
+# Load the demo cases and check they use the same 30 measurements and labels as the model.
 demo_cases = []
 demo_cases_error = None
 try:
     demo_cases = load_demo_cases(DEMO_CASES_PATH)
-    if model_bundle is not None:
-        expected_features = set(model_bundle.get("input_features", []))
+    if model_info is not None:
+        expected_features = set(model_info.get("input_features", []))
         for case in demo_cases:
-            if set(case.get("features", {})) != expected_features or case.get("true_label") not in model_bundle.get("target_names", []):
+            if set(case.get("features", {})) != expected_features or case.get("true_label") not in model_info.get("target_names", []):
                 raise ValueError("A demo case does not match the loaded model's feature schema or class labels.")
 except (OSError, ValueError, json.JSONDecodeError) as error:
     demo_cases_error = str(error)
 
+# ---- Page header ----
+# Title, model status badge, and a progress bar showing how many of the 30 fields are filled.
 measurement_values = st.session_state["measurement_values"]
 filled_count = sum(1 for value in measurement_values.values() if value is not None)
 st.markdown(
     f"""<div class="page-heading">
       <div><div class="eyebrow">PREDICTION</div><h1 class="page-title">Enter diagnostic measurements</h1>
-      <p class="page-subtitle">Enter values from a WDBC measurement report. Your entries stay in this session.</p>
+      <p class="page-subtitle">Enter values from a WDBC measurement report. Each prediction is saved so a doctor can review it.</p>
       <div class="model-status {model_status_class}">{model_status}</div></div>
       <div class="progress-summary"><span>{filled_count} of 30 entered</span>
       <div class="progress-track"><div class="progress-value" style="width:{filled_count / 30 * 100:.1f}%"></div></div></div>
@@ -224,11 +309,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if model_load_error:
-    st.error(f"The trained model bundle could not be loaded: {model_load_error}")
-elif model_bundle is None:
-    st.error("The trained model bundle is missing. Restore `models/breast_cancer_model.joblib` to enable predictions.")
+# Explain how to start the server if it could not be reached.
+if server_error:
+    st.error(
+        f"The prediction server at {API_URL} could not be reached: {server_error}. "
+        "Start it with `uvicorn server:app --port 8000` (or use `./run`, which starts both)."
+    )
 
+# ---- Measurement form ----
+# The main card: demo button, the three section tabs, the 10 fields of the chosen section,
+# and the Clear / Get prediction buttons.
 prediction_clicked = False
 with st.container(border=True):
     title_column, test_column = st.columns([5, 1])
@@ -238,13 +328,14 @@ with st.container(border=True):
             '<p class="card-description">Complete each section using values from the diagnostic report.</p></div></div>',
             unsafe_allow_html=True,
         )
+    # Demo button in the top-right corner of the card.
     with test_column:
         st.button(
             "Load held-out demo case",
             help="Load the next saved case from the held-out test set. Its true label is shown after you request a prediction.",
             on_click=load_demo_input,
             use_container_width=True,
-            disabled=not demo_cases or model_bundle is None,
+            disabled=not demo_cases or model_info is None,
         )
         active_demo_case = st.session_state.get("active_demo_case")
         if active_demo_case:
@@ -254,6 +345,8 @@ with st.container(border=True):
 
     st.markdown('<hr class="card-divider">', unsafe_allow_html=True)
 
+    # Three tabs (Mean, Standard error, Worst). Only one section's 10 fields are shown at a time.
+    # Each tab shows a tick once all 10 of its fields are filled.
     active_group = st.session_state.get("active_group", "mean")
     with st.container(key="measurement_stepper"):
         group_columns = st.columns(3)
@@ -274,6 +367,7 @@ with st.container(border=True):
                     st.session_state["active_group"] = group_key
                     st.rerun()
 
+    # Heading for the chosen section, with a count of how many of its fields are filled.
     active_group_label, active_group_help = next(
         (label, help_text) for key, label, help_text in GROUPS if key == active_group
     )
@@ -291,6 +385,7 @@ with st.container(border=True):
     with count_column:
         st.markdown(f'<div class="group-count">{active_filled} / 10</div>', unsafe_allow_html=True)
 
+    # The 10 number fields for the chosen section, in a grid of 5 columns.
     with st.container(key="feature_grid"):
         feature_columns = st.columns(5)
         for index, (feature_key, feature_label, unit) in enumerate(FEATURES):
@@ -309,6 +404,8 @@ with st.container(border=True):
                 args=(f"{active_group}_{feature_key}", f"field_{active_group}_{feature_key}"),
                     help=FEATURE_HELP[feature_key],
                     label_visibility="collapsed",
+                # Give the field a starting value only the first time it is drawn. After that Streamlit
+                # keeps the value itself, and passing it again would cause a warning.
                 **(
                     {"value": measurement_values.get(f"{active_group}_{feature_key}")}
                     if f"field_{active_group}_{feature_key}" not in st.session_state
@@ -316,6 +413,7 @@ with st.container(border=True):
                 ),
                 )
 
+    # Bottom row of the card. Get prediction is only enabled when all 30 fields are filled and the server is up.
     st.markdown('<hr class="card-divider">', unsafe_allow_html=True)
     with st.container(key="prediction_actions"):
         clear_column, helper_column, predict_column = st.columns([1, 3, 1.5])
@@ -328,10 +426,13 @@ with st.container(border=True):
             prediction_clicked = st.button(
                 "Get prediction",
                 type="primary",
-                disabled=filled_count < 30 or model_bundle is None or model_load_error is not None,
+                disabled=filled_count < 30 or model_info is None,
                 use_container_width=True,
             )
 
+# ---- Prediction ----
+# Runs only on the rerun caused by clicking Get prediction: check the values, send them to the
+# server, and save the server's answer in the session.
 if prediction_clicked:
     input_values = {
         f"{group}_{feature}": measurement_values.get(f"{group}_{feature}")
@@ -342,74 +443,97 @@ if prediction_clicked:
         st.error("Enter all 30 measurements before requesting a prediction.")
     elif not all(is_valid_measurement(value) for value in input_values.values()):
         st.error("Enter a finite numeric measurement of zero or greater in each field.")
-    elif model_load_error:
-        st.error(f"The trained model could not be loaded: {model_load_error}")
-    elif model_bundle is None:
-        st.error("No trained model was found. Run `python train_model.py` first.")
+    elif model_info is None:
+        st.error("The prediction server is not reachable, so no prediction can be made.")
     else:
-        expected_keys = model_bundle.get("input_keys", [])
-        feature_names = model_bundle.get("input_features", [])
-        training_ranges = model_bundle.get("training_ranges", {})
-        schema_ok = (
-            len(expected_keys) == 30
-            and len(feature_names) == 30
-            and set(expected_keys) == set(input_values)
-            and set(training_ranges) == set(expected_keys)
-            and model_bundle.get("positive_class") == "malignant"
-        )
-        if not schema_ok:
-            st.error("The model's feature schema does not match the 30 inputs in this app.")
+        try:
+            response = requests.post(
+                f"{API_URL}/predictions",
+                json={"features": {key: float(value) for key, value in input_values.items()}},
+                timeout=REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+        except requests.RequestException as error:
+            st.error(f"The prediction request failed: {api_error_message(error)}")
         else:
-            out_of_range = []
-            feature_name_by_key = dict(zip(expected_keys, feature_names))
-            for key in expected_keys:
-                lower = training_ranges[key]["min"]
-                upper = training_ranges[key]["max"]
-                value = float(input_values[key])
-                if value < lower or value > upper:
-                    out_of_range.append(f"{feature_name_by_key[key]} ({lower:.5g}–{upper:.5g})")
-
-            ordered_values = [[float(input_values[key]) for key in expected_keys]]
-            estimator = model_bundle["model"]
-            predicted_label = int(estimator.predict(ordered_values)[0])
-            class_labels = [int(label) for label in estimator.classes_]
-            class_names = model_bundle["target_names"]
-            scores = estimator.predict_proba(ordered_values)[0]
-            score_by_name = {
-                str(class_names[label]): float(score)
-                for label, score in zip(class_labels, scores)
+            # Keep the result in the session so it stays visible while the doctor uses the review controls.
+            st.session_state["last_prediction"] = {
+                **response.json(),
+                "demo_case": st.session_state.get("active_demo_case"),
             }
 
-            malignancy_probability = score_by_name["malignant"]
-            score_card = (
-                '<div class="score-item"><div class="score-label">Probability of malignancy</div>'
-                f'<div class="score-value">{malignancy_probability:.3%}</div></div>'
-            )
+# ---- Result and doctor review ----
+# Drawn on every rerun while a prediction is saved, so the result stays on screen while the
+# doctor uses the toggle (every click on the page reruns this script).
+last_prediction = st.session_state.get("last_prediction")
+if last_prediction:
+    prediction_id = last_prediction["prediction_id"]
+    predicted_name = last_prediction["predicted_label"]
+    score_card = (
+        '<div class="score-item"><div class="score-label">Probability of malignancy</div>'
+        f'<div class="score-value">{last_prediction["malignant_probability"]:.3%}</div></div>'
+    )
+    st.markdown(
+        f'<div class="result-panel"><h2 class="result-title">Model output</h2>'
+        f'<div class="result-class">Model classification: {predicted_name.title()}</div>'
+        f'<div class="score-row">{score_card}</div>'
+        '<p class="result-footnote">This model-estimated probability is not a calibrated estimate of individual risk. '
+        'This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings. '
+        f'Prediction #{prediction_id}, model version {last_prediction["model_version"]}.</p></div>',
+        unsafe_allow_html=True,
+    )
+    # For demo cases, show the real diagnosis next to the model's answer.
+    demo_case = last_prediction.get("demo_case")
+    if demo_case:
+        actual_label = str(demo_case["true_label"]).title()
+        match_text = "The prediction matches the true label." if predicted_name.lower() == actual_label.lower() else "The prediction differs from the true label."
+        st.info(
+            f"Held-out case {demo_case['number']} actual label: {actual_label}. "
+            f"Model prediction: {predicted_name.title()}. {match_text}"
+        )
+    # Warn if any value is outside what the model saw in training; predictions there are less reliable.
+    if last_prediction["out_of_range"]:
+        st.warning(
+            "One or more values are outside the training data ranges. The result may be unreliable. "
+            "Out-of-range measurements: " + ", ".join(last_prediction["out_of_range"])
+        )
+
+    # The doctor review section under the answer.
+    with st.container(border=True, key="review_panel"):
+        st.markdown(
+            '<h2 class="review-title">Doctor review</h2>'
+            '<p class="review-description">Confirm whether the model classification matches the diagnosis. '
+            'Confirmed cases are added to the training data and the model retrains in the background.</p>',
+            unsafe_allow_html=True,
+        )
+        review = last_prediction.get("review")
+        # Already reviewed: show what was saved instead of the controls.
+        if review:
+            verdict = "correct" if review["confirmed_label"] == predicted_name else "incorrect"
+            message = f"Review saved: prediction marked {verdict}. Confirmed diagnosis: {review['confirmed_label'].title()}."
+            if review["added_to_training"]:
+                st.success(message + " The case was added to the training data and the model is retraining.")
+            else:
+                st.success(message)
+                st.caption(review["excluded_reason"])
+        else:
+            # Toggle on means the AI was right. Toggle off means the diagnosis is the other class.
+            # The line below the toggle shows which diagnosis will be saved.
+            prediction_correct = st.toggle("The AI prediction is correct", key=f"review_correct_{prediction_id}")
+            other_label = "benign" if predicted_name == "malignant" else "malignant"
+            confirmed_label = predicted_name if prediction_correct else other_label
             st.markdown(
-                f'<div class="result-panel"><h2 class="result-title">Model output</h2>'
-                f'<div class="result-class">Model classification: {class_names[predicted_label].title()}</div>'
-                f'<div class="score-row">{score_card}</div>'
-                '<p class="result-footnote">This model-estimated probability is not a calibrated estimate of individual risk. '
-                'This output is not a diagnosis and must be interpreted by a qualified healthcare professional alongside clinical findings.</p></div>',
+                f'<p class="review-summary">Diagnosis to be recorded: <strong>{confirmed_label.title()}</strong></p>',
                 unsafe_allow_html=True,
             )
-            active_demo_case = st.session_state.get("active_demo_case")
-            if active_demo_case:
-                actual_label = str(active_demo_case["true_label"]).title()
-                predicted_name = str(class_names[predicted_label]).title()
-                match_text = "The prediction matches the true label." if predicted_name.lower() == actual_label.lower() else "The prediction differs from the true label."
-                st.info(
-                    f"Held-out case {active_demo_case['number']} actual label: {actual_label}. "
-                    f"Model prediction: {predicted_name}. {match_text}"
-                )
-            if out_of_range:
-                st.warning(
-                    "One or more values are outside the training data ranges. The result may be unreliable. "
-                    "Out-of-range measurements: " + ", ".join(out_of_range)
-                )
+            st.button("Submit review", type="primary", key=f"submit_review_{prediction_id}",
+                      on_click=submit_review, args=(prediction_id,))
+            if last_prediction.get("review_error"):
+                st.error(f"The review could not be saved: {last_prediction['review_error']}")
 
+# Footer note about what is stored.
 st.markdown(
-    '<p class="privacy-note">Inputs stay in this page session and are cleared when you leave or clear the form. '
+    '<p class="privacy-note">Each prediction and its measurements are saved to the local database, along with any doctor review. '
     'No patient identity is requested or stored. This model is for demonstration only, not clinical use.</p>',
     unsafe_allow_html=True,
 )

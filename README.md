@@ -64,6 +64,10 @@ The training script uses scikit-learn's bundled WDBC data (569 rows, 30 features
 python train_model.py
 ```
 
+### Dataset quality inspection
+
+Before splitting the data, the script records the source, row and feature counts, numeric types, missing and infinite values, duplicate feature rows, constant features, class distribution, and minimum/maximum and unique-value count for every feature. The bundled dataset currently has 569 rows and 30 numeric features, with no missing values, infinite values, duplicate feature rows, or constant features. It contains 212 malignant cases (37.26%) and 357 benign cases (62.74%). The stratified split preserves this class distribution in the train and test subsets. See [`models/data_quality_report.json`](models/data_quality_report.json) for the full per-feature ranges and audit details.
+
 The procedure is fixed:
 
 1. Make one stratified 80/20 train/test split with seed 42.
@@ -108,6 +112,7 @@ Running `python train_model.py` creates or replaces:
 | --- | --- |
 | `models/breast_cancer_model.joblib` | Selected tuned pipeline, training-split demo profiles and ranges, feature names and input keys, positive-class label, and run metadata. |
 | `models/model_evidence.json` | Every grid combination's CV scores, best parameters, selection decision, test metrics for all three models, confusion matrices, and library versions. |
+| `models/data_quality_report.json` | Pre-split dataset quality audit, class counts, and per-feature ranges. |
 | `models/roc_curves.png` | Held-out ROC curves for all three models. |
 | `models/confusion_matrices.png` | Held-out confusion matrices for all three models. |
 | `demo_cases.csv` | Six held-out rows: three benign and three malignant, all 30 measurements, true label, and selected-model prediction and score for comparison. |

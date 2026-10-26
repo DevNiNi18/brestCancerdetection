@@ -46,6 +46,7 @@ TEST_SIZE = 0.20
 OUTPUT_DIR = Path("models")
 MODEL_PATH = OUTPUT_DIR / "breast_cancer_model.joblib"
 EVIDENCE_PATH = OUTPUT_DIR / "model_evidence.json"
+QUALITY_PATH = OUTPUT_DIR / "data_quality_report.json"
 ROC_PLOT_PATH = OUTPUT_DIR / "roc_curves.png"
 CONFUSION_PLOT_PATH = OUTPUT_DIR / "confusion_matrices.png"
 DEMO_PATH = Path("demo_cases.csv")
@@ -65,6 +66,44 @@ def app_input_key(dataset_feature_name: str) -> str:
     else:
         raise ValueError(f"Unrecognized WDBC feature name: {dataset_feature_name}")
     return f"{group}_{'_'.join(feature_parts)}"
+
+
+def inspect_data_quality(X, y, feature_names, target_names) -> dict:
+    """Summarize missingness, numeric validity, duplicates, constants, and ranges."""
+    frame = pd.DataFrame(X, columns=feature_names)
+    feature_summaries = []
+    for feature_name in feature_names:
+        column = frame[feature_name]
+        feature_summaries.append({
+            "name": str(feature_name),
+            "dtype": str(column.dtype),
+            "missing_values": int(column.isna().sum()),
+            "unique_values": int(column.nunique(dropna=True)),
+            "minimum": float(column.min()),
+            "maximum": float(column.max()),
+            "constant": bool(column.nunique(dropna=True) <= 1),
+        })
+
+    class_counts = {
+        str(class_name): int(np.count_nonzero(y == label))
+        for label, class_name in enumerate(target_names)
+    }
+    row_count = int(len(y))
+    return {
+        "source": "scikit-learn bundled load_breast_cancer dataset (Wisconsin Diagnostic Breast Cancer)",
+        "rows": row_count,
+        "feature_count": int(X.shape[1]),
+        "all_features_numeric": bool(all(pd.api.types.is_numeric_dtype(frame[name]) for name in feature_names)),
+        "missing_value_count": int(frame.isna().sum().sum()),
+        "infinite_value_count": int(np.count_nonzero(np.isinf(X))),
+        "duplicate_feature_rows": int(frame.duplicated().sum()),
+        "constant_features": [item["name"] for item in feature_summaries if item["constant"]],
+        "class_distribution": {
+            name: {"count": count, "percentage": round(count / row_count * 100, 2)}
+            for name, count in class_counts.items()
+        },
+        "features": feature_summaries,
+    }
 
 
 def make_models_and_grids():
@@ -217,6 +256,12 @@ def main() -> None:
     input_keys = [app_input_key(name) for name in feature_names]
     malignant_label = int(np.flatnonzero(dataset.target_names == "malignant")[0])
     benign_label = int(np.flatnonzero(dataset.target_names == "benign")[0])
+    data_quality = inspect_data_quality(X, y, feature_names, dataset.target_names)
+
+    print("Dataset quality inspection (performed before splitting):")
+    print(json.dumps({key: value for key, value in data_quality.items() if key != "features"}, indent=2))
+    print("Feature ranges and unique-value counts:")
+    print(pd.DataFrame(data_quality["features"]).to_string(index=False))
 
     # Keep original indices so the selected demonstration cases are auditable.
     all_indices = np.arange(len(y))
@@ -358,6 +403,7 @@ def main() -> None:
         }
     evidence = {
         "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+        "data_quality": data_quality,
         "observations": int(len(y)),
         "training_observations": int(len(train_indices)),
         "test_observations": int(len(test_indices)),
@@ -374,6 +420,7 @@ def main() -> None:
         "selection_decision": selection,
         "test_results": test_json,
         "saved_model": str(MODEL_PATH),
+        "data_quality_report": str(QUALITY_PATH),
         "plots": {"roc_curves": str(ROC_PLOT_PATH), "confusion_matrices": str(CONFUSION_PLOT_PATH)},
         "demo_cases": str(DEMO_PATH),
         "demo_profiles_source": "One confidently classified benign and one confidently classified malignant row, selected from the training split only.",
@@ -389,6 +436,7 @@ def main() -> None:
         "warning": "Educational prototype results on a small public dataset do not establish clinical performance.",
     }
     EVIDENCE_PATH.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    QUALITY_PATH.write_text(json.dumps(data_quality, indent=2) + "\n", encoding="utf-8")
 
     cv_frame = pd.DataFrame(cv_records)
     print("\nFull cross-validation results (all grid combinations):")
@@ -404,6 +452,7 @@ def main() -> None:
     print(f"Selection decision: {selection}")
     print(f"Model bundle: {MODEL_PATH}")
     print(f"Evidence JSON: {EVIDENCE_PATH}")
+    print(f"Dataset quality report: {QUALITY_PATH}")
     print(f"ROC curves: {ROC_PLOT_PATH}")
     print(f"Confusion matrices: {CONFUSION_PLOT_PATH}")
     print(f"Demo cases from held-out test rows: {DEMO_PATH}")

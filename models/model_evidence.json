@@ -1,5 +1,297 @@
 {
   "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+  "data_quality": {
+    "source": "scikit-learn bundled load_breast_cancer dataset (Wisconsin Diagnostic Breast Cancer)",
+    "rows": 569,
+    "feature_count": 30,
+    "all_features_numeric": true,
+    "missing_value_count": 0,
+    "infinite_value_count": 0,
+    "duplicate_feature_rows": 0,
+    "constant_features": [],
+    "class_distribution": {
+      "malignant": {
+        "count": 212,
+        "percentage": 37.26
+      },
+      "benign": {
+        "count": 357,
+        "percentage": 62.74
+      }
+    },
+    "features": [
+      {
+        "name": "mean radius",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 456,
+        "minimum": 6.981,
+        "maximum": 28.11,
+        "constant": false
+      },
+      {
+        "name": "mean texture",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 479,
+        "minimum": 9.71,
+        "maximum": 39.28,
+        "constant": false
+      },
+      {
+        "name": "mean perimeter",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 522,
+        "minimum": 43.79,
+        "maximum": 188.5,
+        "constant": false
+      },
+      {
+        "name": "mean area",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 539,
+        "minimum": 143.5,
+        "maximum": 2501.0,
+        "constant": false
+      },
+      {
+        "name": "mean smoothness",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 474,
+        "minimum": 0.05263,
+        "maximum": 0.1634,
+        "constant": false
+      },
+      {
+        "name": "mean compactness",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 537,
+        "minimum": 0.01938,
+        "maximum": 0.3454,
+        "constant": false
+      },
+      {
+        "name": "mean concavity",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 537,
+        "minimum": 0.0,
+        "maximum": 0.4268,
+        "constant": false
+      },
+      {
+        "name": "mean concave points",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 542,
+        "minimum": 0.0,
+        "maximum": 0.2012,
+        "constant": false
+      },
+      {
+        "name": "mean symmetry",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 432,
+        "minimum": 0.106,
+        "maximum": 0.304,
+        "constant": false
+      },
+      {
+        "name": "mean fractal dimension",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 499,
+        "minimum": 0.04996,
+        "maximum": 0.09744,
+        "constant": false
+      },
+      {
+        "name": "radius error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 540,
+        "minimum": 0.1115,
+        "maximum": 2.873,
+        "constant": false
+      },
+      {
+        "name": "texture error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 519,
+        "minimum": 0.3602,
+        "maximum": 4.885,
+        "constant": false
+      },
+      {
+        "name": "perimeter error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 533,
+        "minimum": 0.757,
+        "maximum": 21.98,
+        "constant": false
+      },
+      {
+        "name": "area error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 528,
+        "minimum": 6.802,
+        "maximum": 542.2,
+        "constant": false
+      },
+      {
+        "name": "smoothness error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 547,
+        "minimum": 0.001713,
+        "maximum": 0.03113,
+        "constant": false
+      },
+      {
+        "name": "compactness error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 541,
+        "minimum": 0.002252,
+        "maximum": 0.1354,
+        "constant": false
+      },
+      {
+        "name": "concavity error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 533,
+        "minimum": 0.0,
+        "maximum": 0.396,
+        "constant": false
+      },
+      {
+        "name": "concave points error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 507,
+        "minimum": 0.0,
+        "maximum": 0.05279,
+        "constant": false
+      },
+      {
+        "name": "symmetry error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 498,
+        "minimum": 0.007882,
+        "maximum": 0.07895,
+        "constant": false
+      },
+      {
+        "name": "fractal dimension error",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 545,
+        "minimum": 0.0008948,
+        "maximum": 0.02984,
+        "constant": false
+      },
+      {
+        "name": "worst radius",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 457,
+        "minimum": 7.93,
+        "maximum": 36.04,
+        "constant": false
+      },
+      {
+        "name": "worst texture",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 511,
+        "minimum": 12.02,
+        "maximum": 49.54,
+        "constant": false
+      },
+      {
+        "name": "worst perimeter",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 514,
+        "minimum": 50.41,
+        "maximum": 251.2,
+        "constant": false
+      },
+      {
+        "name": "worst area",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 544,
+        "minimum": 185.2,
+        "maximum": 4254.0,
+        "constant": false
+      },
+      {
+        "name": "worst smoothness",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 411,
+        "minimum": 0.07117,
+        "maximum": 0.2226,
+        "constant": false
+      },
+      {
+        "name": "worst compactness",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 529,
+        "minimum": 0.02729,
+        "maximum": 1.058,
+        "constant": false
+      },
+      {
+        "name": "worst concavity",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 539,
+        "minimum": 0.0,
+        "maximum": 1.252,
+        "constant": false
+      },
+      {
+        "name": "worst concave points",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 492,
+        "minimum": 0.0,
+        "maximum": 0.291,
+        "constant": false
+      },
+      {
+        "name": "worst symmetry",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 500,
+        "minimum": 0.1565,
+        "maximum": 0.6638,
+        "constant": false
+      },
+      {
+        "name": "worst fractal dimension",
+        "dtype": "float64",
+        "missing_values": 0,
+        "unique_values": 535,
+        "minimum": 0.05504,
+        "maximum": 0.2075,
+        "constant": false
+      }
+    ]
+  },
   "observations": 569,
   "training_observations": 455,
   "test_observations": 114,
@@ -679,7 +971,7 @@
         "n_estimators": 100
       },
       "mean_roc_auc": 0.9902992776057792,
-      "std_roc_auc": 0.007182543917979536,
+      "std_roc_auc": 0.007182543917979523,
       "mean_recall": 0.9411764705882352,
       "std_recall": 0.04159451654038516,
       "mean_precision": 0.9543849206349206,
@@ -1026,6 +1318,7 @@
     }
   },
   "saved_model": "models/breast_cancer_model.joblib",
+  "data_quality_report": "models/data_quality_report.json",
   "plots": {
     "roc_curves": "models/roc_curves.png",
     "confusion_matrices": "models/confusion_matrices.png"

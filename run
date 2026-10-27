@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
-# Starts the prediction server (server.py) and the Streamlit app (app.py) together.
-# Usage: ./run   then open http://localhost:3001. Press Ctrl+C to stop both.
-
-# Stop at the first error, and treat unset variables as errors.
 set -euo pipefail
 
 # Always run from the project directory, even if this script is called elsewhere.
 PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
-# Create the project's virtual environment the first time this runs.
 if [[ ! -d .venv ]]; then
     python3 -m venv .venv
 fi
@@ -20,28 +15,8 @@ if [[ ! -x "$PYTHON" ]]; then
     exit 1
 fi
 
-# Install the packages from requirements.txt if any of them are missing.
-if ! "$PYTHON" -c 'import streamlit, fastapi, uvicorn, requests' >/dev/null 2>&1; then
+if ! "$PYTHON" -c 'import streamlit' >/dev/null 2>&1; then
     "$PYTHON" -m pip install -r requirements.txt
 fi
 
-# Start the prediction server in the background and stop it when the app exits.
-"$PYTHON" -m uvicorn server:app --host 127.0.0.1 --port 8000 &
-SERVER_PID=$!
-trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-
-# Wait up to 60 seconds for the server to answer /health. On its first start it creates
-# the database and may train a model, which takes a few seconds.
-for _ in $(seq 1 60); do
-    if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
-        break
-    fi
-    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-        echo "The prediction server failed to start." >&2
-        exit 1
-    fi
-    sleep 1
-done
-
-# Run the web page. When it stops, the trap above also stops the server.
-"$PYTHON" -m streamlit run app.py --server.port 3001
+exec "$PYTHON" -m streamlit run app.py --server.port 3001

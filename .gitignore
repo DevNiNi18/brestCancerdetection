@@ -10,6 +10,5 @@ dist/
 .vscode/
 node_modules
 
-# Local database of predictions and doctor reviews
+# Local database from the database branch
 data/
-*.joblib.tmp

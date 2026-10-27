@@ -1,25 +1,13 @@
-"""Tune, evaluate, and save a Logistic Regression WDBC breast-cancer classifier.
+"""Tune, compare, and save the specified WDBC breast-cancer classifiers.
 
-Training records come from the SQLite database: the original WDBC training split
-plus any cases a doctor has reviewed in the app. The WDBC test split stays fixed
-and is held back until the grid search is complete. The tuned pipeline is saved
-as evaluated, without fitting it again on the held-out records.
-
-Run it by hand with `python train_model.py` from the project folder. The server
-(server.py) also calls `train_and_save()` to retrain after each doctor review.
-
-Steps in `train_and_save()`:
-  1. Check the quality of the original dataset (for the report only).
-  2. Load the training and test records from the database.
-  3. Tune Logistic Regression's C setting with 5-fold cross-validation.
-  4. Score the tuned model once on the test records.
-  5. Save the model, a new version row in the database, plots, and reports.
+The test split is held back until every grid search and the model-selection rule
+are complete. The selected tuned pipeline is saved as evaluated, without fitting
+it again on the held-out records or the full dataset.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import platform
 from importlib.metadata import version
 from pathlib import Path
@@ -27,13 +15,13 @@ from pathlib import Path
 import joblib
 import matplotlib
 
-# Draw plots straight to image files without opening a window (needed on the server too).
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sklearn
 from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     auc,
@@ -45,34 +33,45 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 
-import database
-from database import DATASET_NAME, FEATURE_KEYS, FEATURE_NAMES, SEED, TARGET_NAMES, TEST_SIZE
 
-
-# Files this script writes. The paths are relative to the project folder, so run it from there.
+SEED = 42
+TEST_SIZE = 0.20
 OUTPUT_DIR = Path("models")
 MODEL_PATH = OUTPUT_DIR / "breast_cancer_model.joblib"
 EVIDENCE_PATH = OUTPUT_DIR / "model_evidence.json"
 QUALITY_PATH = OUTPUT_DIR / "data_quality_report.json"
-ROC_PLOT_PATH = OUTPUT_DIR / "roc_curve.png"
-CONFUSION_PLOT_PATH = OUTPUT_DIR / "confusion_matrix.png"
+ROC_PLOT_PATH = OUTPUT_DIR / "roc_curves.png"
+CONFUSION_PLOT_PATH = OUTPUT_DIR / "confusion_matrices.png"
 TRAINING_DATA_PATH = Path("training_data.json")
 TESTING_DATA_PATH = Path("testing_data.json")
 DEMO_PATH = Path("demo_cases.json")
 
-# Shown in the app header and in the reports.
-MODEL_NAME = "Logistic Regression"
+MODEL_ORDER = {"Logistic Regression": 0, "SVM": 1, "Random Forest": 2}
+
+
+def app_input_key(dataset_feature_name: str) -> str:
+    """Map a scikit-learn WDBC feature name to the Streamlit form key."""
+    parts = dataset_feature_name.split()
+    if parts[0] == "mean":
+        group, feature_parts = "mean", parts[1:]
+    elif parts[0] == "worst":
+        group, feature_parts = "worst", parts[1:]
+    elif parts[-1] == "error":
+        group, feature_parts = "se", parts[:-1]
+    else:
+        raise ValueError(f"Unrecognized WDBC feature name: {dataset_feature_name}")
+    return f"{group}_{'_'.join(feature_parts)}"
 
 
 def inspect_data_quality(X, y, feature_names, target_names) -> dict:
     """Summarize missingness, numeric validity, duplicates, constants, and ranges."""
     frame = pd.DataFrame(X, columns=feature_names)
-    # One summary per measurement: type, gaps, number of distinct values, and range.
     feature_summaries = []
     for feature_name in feature_names:
         column = frame[feature_name]
@@ -86,12 +85,10 @@ def inspect_data_quality(X, y, feature_names, target_names) -> dict:
             "constant": bool(column.nunique(dropna=True) <= 1),
         })
 
-    # How many records are benign and how many are malignant.
     class_counts = {
         str(class_name): int(np.count_nonzero(y == label))
         for label, class_name in enumerate(target_names)
     }
-    # Dataset-wide checks. Anything missing, infinite, duplicated, or constant would need fixing before training.
     row_count = int(len(y))
     return {
         "source": "scikit-learn bundled load_breast_cancer dataset (Wisconsin Diagnostic Breast Cancer)",
@@ -110,30 +107,48 @@ def inspect_data_quality(X, y, feature_names, target_names) -> dict:
     }
 
 
-def make_model_and_grid():
-    """Return the Logistic Regression pipeline and its parameter grid."""
-    # A pipeline runs its steps in order. StandardScaler puts every measurement on the same scale
-    # (mean 0, spread 1) so large values such as area don't outweigh small ones such as smoothness.
-    # Because the scaler is inside the pipeline, it only learns from the training folds during cross-validation.
-    pipeline = Pipeline([
-        ("scaler", StandardScaler()),
-        ("classifier", LogisticRegression(solver="lbfgs", max_iter=1000, random_state=SEED)),
-    ])
-    # Values of C to try. C controls regularization: a small C keeps the model simple, a large C lets
-    # it fit the training data more closely. The "classifier__" prefix applies the setting to that pipeline step.
-    parameter_grid = {
-        "classifier__C": [0.01, 0.1, 1, 10, 100],
+def make_models_and_grids():
+    """Return only the three models and parameter grids required by the brief."""
+    models = {
+        "Logistic Regression": (
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", LogisticRegression(solver="lbfgs", max_iter=1000, random_state=SEED)),
+            ]),
+            {
+                "classifier__C": [0.01, 0.1, 1, 10, 100],
+            },
+        ),
+        "SVM": (
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("classifier", SVC(probability=True, random_state=SEED)),
+            ]),
+            {
+                "classifier__kernel": ["linear", "rbf"],
+                "classifier__C": [0.1, 1, 10, 100],
+                "classifier__gamma": ["scale", 0.01, 0.001],
+            },
+        ),
+        "Random Forest": (
+            RandomForestClassifier(random_state=SEED, n_jobs=-1),
+            {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [None, 5, 10],
+                "min_samples_split": [2, 5],
+            },
+        ),
     }
-    return pipeline, parameter_grid
+    return models
 
 
-def build_cv_records(search: GridSearchCV) -> list[dict]:
+def build_cv_records(model_name: str, search: GridSearchCV) -> list[dict]:
     """Flatten every parameter combination and all requested CV metrics."""
-    # GridSearchCV stores its results as columns; turn them into one row per C value.
     results = search.cv_results_
     records = []
     for index, params in enumerate(results["params"]):
         records.append({
+            "model": model_name,
             "parameters": params,
             "mean_roc_auc": float(results["mean_test_roc_auc"][index]),
             "std_roc_auc": float(results["std_test_roc_auc"][index]),
@@ -151,18 +166,11 @@ def build_cv_records(search: GridSearchCV) -> list[dict]:
 
 
 def evaluate_test_set(estimator, X_test, y_test, malignant_label: int, benign_label: int) -> dict:
-    """Score the model on the held-out test records, with malignant as the positive class.
-
-    Also returns the raw scores and predictions, which the plots need but the JSON reports leave out.
-    """
     predictions = estimator.predict(X_test)
     class_labels = [int(label) for label in estimator.classes_]
-    # Find which column of predict_proba holds the probability of malignancy.
     malignant_index = class_labels.index(malignant_label)
     malignant_scores = estimator.predict_proba(X_test)[:, malignant_index]
     malignant_truth = (y_test == malignant_label).astype(int)
-    # Rows are the actual class and columns the predicted class, malignant first:
-    # [[cancers caught, cancers missed], [false alarms, benign correctly cleared]].
     matrix = confusion_matrix(y_test, predictions, labels=[malignant_label, benign_label])
     return {
         "accuracy": float(accuracy_score(y_test, predictions)),
@@ -178,66 +186,67 @@ def evaluate_test_set(estimator, X_test, y_test, malignant_label: int, benign_la
     }
 
 
-def save_plots(results: dict) -> None:
-    """Save the ROC curve and confusion matrix images for the test-set results."""
+def save_comparison_plots(evaluations: dict) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    # ROC curve: cancers caught against false alarms at every possible cut-off. The dashed line is guessing.
     fig, axis = plt.subplots(figsize=(8, 7))
-    false_positive_rate, true_positive_rate, _ = roc_curve(
-        results["malignant_truth"], results["malignant_scores"]
-    )
-    curve_auc = auc(false_positive_rate, true_positive_rate)
-    axis.plot(false_positive_rate, true_positive_rate, linewidth=2,
-              label=f"{MODEL_NAME} (AUC = {curve_auc:.3f})")
+    for model_name, results in evaluations.items():
+        false_positive_rate, true_positive_rate, _ = roc_curve(
+            results["malignant_truth"], results["malignant_scores"]
+        )
+        curve_auc = auc(false_positive_rate, true_positive_rate)
+        axis.plot(false_positive_rate, true_positive_rate, linewidth=2,
+                  label=f"{model_name} (AUC = {curve_auc:.3f})")
     axis.plot([0, 1], [0, 1], "--", color="#777777", linewidth=1, label="Chance")
-    axis.set(title="ROC curve (malignant is positive)", xlabel="False positive rate", ylabel="True positive rate")
+    axis.set(title="ROC curves (malignant is positive)", xlabel="False positive rate", ylabel="True positive rate")
     axis.legend(loc="lower right")
     axis.grid(alpha=0.2)
     fig.tight_layout()
     fig.savefig(ROC_PLOT_PATH, dpi=160)
     plt.close(fig)
 
-    # Confusion matrix: a 2x2 grid counting the right and wrong predictions for each class.
-    fig, axis = plt.subplots(figsize=(5.5, 4.8))
-    matrix = np.asarray(results["confusion_matrix"])
-    axis.imshow(matrix, cmap="Blues")
-    axis.set(title=f"{MODEL_NAME} confusion matrix", xticks=[0, 1], yticks=[0, 1],
-             xticklabels=["Malignant", "Benign"], yticklabels=["Malignant", "Benign"],
-             xlabel="Predicted", ylabel="Actual")
-    for row in range(2):
-        for column in range(2):
-            axis.text(column, row, str(matrix[row, column]), ha="center", va="center", color="#162b4d")
+    fig, axes = plt.subplots(1, len(evaluations), figsize=(15, 4.8))
+    for axis, (model_name, results) in zip(axes, evaluations.items()):
+        matrix = np.asarray(results["confusion_matrix"])
+        axis.imshow(matrix, cmap="Blues")
+        axis.set(title=model_name, xticks=[0, 1], yticks=[0, 1],
+                 xticklabels=["Malignant", "Benign"], yticklabels=["Malignant", "Benign"],
+                 xlabel="Predicted", ylabel="Actual")
+        for row in range(2):
+            for column in range(2):
+                axis.text(column, row, str(matrix[row, column]), ha="center", va="center", color="#162b4d")
+    fig.suptitle("Confusion matrices (malignant first)")
     fig.tight_layout()
     fig.savefig(CONFUSION_PLOT_PATH, dpi=160)
     plt.close(fig)
 
 
-def write_dataset_files(connection) -> None:
-    """Save the original WDBC training and test splits as JSON snapshots."""
+def write_dataset_files(dataset, train_indices, test_indices) -> None:
+    """Save the deterministic training and test sets as separate JSON files."""
+    def records(indices):
+        return [
+            {
+                "source_index": int(index),
+                "features": {
+                    str(name): float(value)
+                    for name, value in zip(dataset.feature_names, dataset.data[index])
+                },
+                "target": str(dataset.target_names[dataset.target[index]]),
+            }
+            for index in indices
+        ]
+
     metadata = {
-        "dataset": DATASET_NAME,
-        "target_names": TARGET_NAMES,
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
+        "target_names": [str(name) for name in dataset.target_names],
         "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
     }
-    # Only the original WDBC records are exported; doctor-reviewed cases stay in the database.
-    for split, path in (("training", TRAINING_DATA_PATH), ("testing", TESTING_DATA_PATH)):
-        rows = connection.execute(
-            "SELECT * FROM records WHERE source = 'wdbc' AND split = ? ORDER BY id", (split,)
-        ).fetchall()
-        records = [
-            {
-                "source_index": int(row["source_index"]),
-                "features": {name: float(row[key]) for name, key in zip(FEATURE_NAMES, FEATURE_KEYS)},
-                "target": row["label"],
-            }
-            for row in rows
-        ]
-        snapshot = {**metadata, "set": split, "records": records}
-        path.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+    training = {**metadata, "set": "training", "records": records(train_indices)}
+    testing = {**metadata, "set": "testing", "records": records(test_indices)}
+    TRAINING_DATA_PATH.write_text(json.dumps(training, indent=2) + "\n", encoding="utf-8")
+    TESTING_DATA_PATH.write_text(json.dumps(testing, indent=2) + "\n", encoding="utf-8")
 
 
-def write_demo_cases(X_test, y_test, malignant_label, benign_label, estimator) -> None:
-    """Save six held-out test records (the first 3 benign and 3 malignant) for the app's demo button."""
+def write_demo_cases(dataset, X_test, y_test, malignant_label, benign_label, selected_estimator) -> None:
     rows = []
     for label in (benign_label, malignant_label):
         matching = np.flatnonzero(y_test == label)[:3]
@@ -245,49 +254,45 @@ def write_demo_cases(X_test, y_test, malignant_label, benign_label, estimator) -
             rows.append((X_test[row_index], int(label)))
     if len(rows) != 6:
         raise RuntimeError("The held-out test set must contain at least three examples of each class.")
-    # Store each case's real label and the current model's answer for it.
     demo_cases = []
     for values, label in rows:
-        row_prediction = int(estimator.predict([values])[0])
-        classes = [int(class_label) for class_label in estimator.classes_]
+        row_prediction = int(selected_estimator.predict([values])[0])
+        classes = [int(class_label) for class_label in selected_estimator.classes_]
         malignant_probability = float(
-            estimator.predict_proba([values])[0][classes.index(malignant_label)]
+            selected_estimator.predict_proba([values])[0][classes.index(malignant_label)]
         )
         demo_cases.append({
-            "features": {name: float(value) for name, value in zip(FEATURE_NAMES, values)},
-            "true_label": TARGET_NAMES[label],
-            "model_prediction": TARGET_NAMES[row_prediction],
-            "model_malignant_probability": malignant_probability,
+            "features": {str(name): float(value) for name, value in zip(dataset.feature_names, values)},
+            "true_label": str(dataset.target_names[label]),
+            "selected_model_prediction": str(dataset.target_names[row_prediction]),
+            "selected_model_malignant_probability": malignant_probability,
         })
     DEMO_PATH.write_text(json.dumps(demo_cases, indent=2) + "\n", encoding="utf-8")
 
 
-def train_and_save(verbose: bool = False) -> dict:
-    """Train on the database's training split, evaluate on its test split, and save a new model version."""
-    # 1. Check the original dataset's quality. This is for the report only; nothing is changed.
+def main() -> None:
     dataset = load_breast_cancer()
-    data_quality = inspect_data_quality(dataset.data, dataset.target, FEATURE_NAMES, TARGET_NAMES)
-    if verbose:
-        print("Dataset quality inspection (WDBC dataset before splitting):")
-        print(json.dumps({key: value for key, value in data_quality.items() if key != "features"}, indent=2))
-        print("Feature ranges and unique-value counts:")
-        print(pd.DataFrame(data_quality["features"]).to_string(index=False))
+    X, y = dataset.data, dataset.target
+    feature_names = list(dataset.feature_names)
+    input_keys = [app_input_key(name) for name in feature_names]
+    malignant_label = int(np.flatnonzero(dataset.target_names == "malignant")[0])
+    benign_label = int(np.flatnonzero(dataset.target_names == "benign")[0])
+    data_quality = inspect_data_quality(X, y, feature_names, dataset.target_names)
 
-    # 2. Load the training records (WDBC + doctor reviews) and the fixed test records.
-    with database.connect() as connection:
-        X_train, train_labels, train_sources = database.fetch_split(connection, "training")
-        X_test, test_labels, _ = database.fetch_split(connection, "testing")
-    # The model works with numbers, so turn the labels into 0 (malignant) and 1 (benign).
-    label_ids = {name: index for index, name in enumerate(TARGET_NAMES)}
-    y_train = np.array([label_ids[name] for name in train_labels])
-    y_test = np.array([label_ids[name] for name in test_labels])
-    malignant_label = label_ids["malignant"]
-    benign_label = label_ids["benign"]
-    review_records = sum(1 for source in train_sources if source == "review")
+    print("Dataset quality inspection (performed before splitting):")
+    print(json.dumps({key: value for key, value in data_quality.items() if key != "features"}, indent=2))
+    print("Feature ranges and unique-value counts:")
+    print(pd.DataFrame(data_quality["features"]).to_string(index=False))
 
-    # 3. Define how each C value is scored during cross-validation. Malignant is the positive
-    # class throughout, because catching cancers is what matters most. This custom scorer
-    # computes ROC-AUC from the probability of malignancy.
+    # Keep original indices so the selected demonstration cases are auditable.
+    all_indices = np.arange(len(y))
+    train_indices, test_indices = train_test_split(
+        all_indices, test_size=TEST_SIZE, random_state=SEED, stratify=y
+    )
+    X_train, X_test = X[train_indices], X[test_indices]
+    y_train, y_test = y[train_indices], y[test_indices]
+    write_dataset_files(dataset, train_indices, test_indices)
+
     def malignant_roc_auc(estimator, features, labels):
         classes = [int(label) for label in estimator.classes_]
         probabilities = estimator.predict_proba(features)[:, classes.index(malignant_label)]
@@ -301,113 +306,125 @@ def train_and_save(verbose: bool = False) -> dict:
         "accuracy": "accuracy",
     }
 
-    # 4. Tune C with 5-fold cross-validation on the training records only. Each fold keeps the
-    # benign/malignant mix. The C with the best mean ROC-AUC (refit="roc_auc") is then fit
-    # again on all the training records.
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-    pipeline, parameter_grid = make_model_and_grid()
-    if verbose:
-        print(f"Tuning {MODEL_NAME} on {len(y_train)} training records ({review_records} from doctor reviews)...")
-    search = GridSearchCV(
-        estimator=pipeline,
-        param_grid=parameter_grid,
-        scoring=scoring,
-        refit="roc_auc",
-        cv=folds,
-        n_jobs=-1,
-        return_train_score=False,
-        error_score="raise",
-    )
-    search.fit(X_train, y_train)
-    # Scores for every C tried, and for the winning one.
-    cv_records = build_cv_records(search)
+    searches = {}
+    cv_records = []
+    for model_name, (pipeline, parameter_grid) in make_models_and_grids().items():
+        print(f"Tuning {model_name}...")
+        search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=parameter_grid,
+            scoring=scoring,
+            refit="roc_auc",
+            cv=folds,
+            n_jobs=-1,
+            return_train_score=False,
+            error_score="raise",
+        )
+        search.fit(X_train, y_train)
+        searches[model_name] = search
+        cv_records.extend(build_cv_records(model_name, search))
+
     best_cv = {
-        "best_parameters": search.best_params_,
-        "mean_roc_auc": float(search.cv_results_["mean_test_roc_auc"][search.best_index_]),
-        "mean_recall": float(search.cv_results_["mean_test_recall"][search.best_index_]),
-        "mean_precision": float(search.cv_results_["mean_test_precision"][search.best_index_]),
-        "mean_f1": float(search.cv_results_["mean_test_f1"][search.best_index_]),
-        "mean_accuracy": float(search.cv_results_["mean_test_accuracy"][search.best_index_]),
+        name: {
+            "best_parameters": search.best_params_,
+            "mean_roc_auc": float(search.cv_results_["mean_test_roc_auc"][search.best_index_]),
+            "mean_recall": float(search.cv_results_["mean_test_recall"][search.best_index_]),
+            "mean_precision": float(search.cv_results_["mean_test_precision"][search.best_index_]),
+            "mean_f1": float(search.cv_results_["mean_test_f1"][search.best_index_]),
+            "mean_accuracy": float(search.cv_results_["mean_test_accuracy"][search.best_index_]),
+        }
+        for name, search in searches.items()
     }
-    # The tuned pipeline (scaler + Logistic Regression), already fit on all the training records.
-    model = search.best_estimator_
-
-    # 5. Score the model once on the test records, then save the plots and demo cases.
-    # The holdout is first accessed here, after tuning is complete.
-    evaluation = evaluate_test_set(model, X_test, y_test, malignant_label, benign_label)
-    save_plots(evaluation)
-    write_demo_cases(X_test, y_test, malignant_label, benign_label, model)
-    # Drop the raw per-record arrays so the results can be saved as JSON.
-    test_json = {
-        key: value for key, value in evaluation.items()
-        if key not in {"malignant_scores", "malignant_truth", "predictions"}
+    best_auc = max(item["mean_roc_auc"] for item in best_cv.values())
+    eligible = [
+        name for name, item in best_cv.items()
+        if item["mean_roc_auc"] >= best_auc - 0.01
+    ]
+    selected_name = sorted(
+        eligible,
+        key=lambda name: (
+            -round(best_cv[name]["mean_recall"], 12),
+            -round(best_cv[name]["mean_f1"], 12),
+            MODEL_ORDER[name],
+        ),
+    )[0]
+    selected_search = searches[selected_name]
+    selection = {
+        "rule": "Among models with mean CV ROC-AUC within 0.01 of the highest, maximize mean CV malignant recall; break ties by F1, then Logistic Regression, SVM, Random Forest.",
+        "best_mean_cv_roc_auc": best_auc,
+        "eligibility_threshold": best_auc - 0.01,
+        "eligible_models": eligible,
+        "selected_model": selected_name,
+        "selected_best_parameters": selected_search.best_params_,
+        "selected_cv_metrics": best_cv[selected_name],
     }
 
-    # 6. Build the model bundle: the model plus everything the server needs to use it. The training
-    # ranges let the server warn when an input is outside what the model has seen.
+    # The holdout is first accessed here, after tuning and selection are complete.
+    evaluations = {}
+    for model_name, search in searches.items():
+        results = evaluate_test_set(search.best_estimator_, X_test, y_test, malignant_label, benign_label)
+        evaluations[model_name] = results
+
+    save_comparison_plots(evaluations)
+    write_demo_cases(
+        dataset, X_test, y_test, malignant_label, benign_label, selected_search.best_estimator_
+    )
+
     train_ranges = {
         key: {"min": float(X_train[:, column].min()), "max": float(X_train[:, column].max())}
-        for column, key in enumerate(FEATURE_KEYS)
+        for column, key in enumerate(input_keys)
     }
-    model_bundle = {
-        "model": model,
-        "model_name": MODEL_NAME,
-        "input_features": FEATURE_NAMES,
-        "input_keys": FEATURE_KEYS,
-        "target_names": TARGET_NAMES,
+    selected_model = selected_search.best_estimator_
+    selected_bundle = {
+        "model": selected_model,
+        "model_name": selected_name,
+        "input_features": feature_names,
+        "input_keys": input_keys,
+        "target_names": list(dataset.target_names),
         "positive_class": "malignant",
         "positive_class_label": malignant_label,
         "training_ranges": train_ranges,
-        "dataset": DATASET_NAME,
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
         "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
-        "training_records": int(len(y_train)),
-        "review_records": review_records,
-        "best_parameters": search.best_params_,
-        "cv_metrics": best_cv,
-        "test_metrics": test_json,
+        "best_parameters": selected_search.best_params_,
+        "cv_metrics": best_cv[selected_name],
         "scikit_learn_version": sklearn.__version__,
     }
-    # 7. Record the new version in the database and save the model file together. If saving the
-    # file fails, the database row is rolled back, so the two never disagree.
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    with database.connect() as connection:
-        model_version = database.insert_model_version(
-            connection, int(len(y_train)), review_records,
-            search.best_params_["classifier__C"], best_cv["mean_roc_auc"], test_json,
-        )
-        model_bundle["version"] = model_version
-        # Write to a temporary file first so the server never reads a half-written model.
-        temporary_path = MODEL_PATH.with_suffix(".joblib.tmp")
-        joblib.dump(model_bundle, temporary_path)
-        os.replace(temporary_path, MODEL_PATH)
-    # 8. Write the evidence report: everything about this run, for checking and reproducing it.
+    joblib.dump(selected_bundle, MODEL_PATH)
+
+    test_json = {}
+    for model_name, results in evaluations.items():
+        test_json[model_name] = {
+            key: value for key, value in results.items()
+            if key not in {"malignant_scores", "malignant_truth", "predictions"}
+        }
     evidence = {
-        "dataset": DATASET_NAME,
-        "model": MODEL_NAME,
-        "model_version": model_version,
-        "database": str(database.DATABASE_PATH.relative_to(Path(__file__).resolve().parent)),
+        "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
         "data_quality": data_quality,
-        "observations": int(len(y_train) + len(y_test)),
-        "training_observations": int(len(y_train)),
-        "training_observations_from_reviews": review_records,
-        "test_observations": int(len(y_test)),
+        "observations": int(len(y)),
+        "training_observations": int(len(train_indices)),
+        "test_observations": int(len(test_indices)),
         "positive_class": "malignant",
         "split": {"test_size": TEST_SIZE, "random_state": SEED, "stratified": True},
         "cross_validation": {
             "folds": 5,
             "shuffle": True,
             "random_state": SEED,
-            "refit_metric": "ROC-AUC (malignant positive)",
+            "selection_refit_metric": "ROC-AUC (malignant positive)",
         },
         "all_cv_parameter_combinations": cv_records,
-        "best_cv_results": best_cv,
+        "best_cv_results_by_model": best_cv,
+        "selection_decision": selection,
         "test_results": test_json,
         "saved_model": str(MODEL_PATH),
         "data_quality_report": str(QUALITY_PATH),
-        "plots": {"roc_curve": str(ROC_PLOT_PATH), "confusion_matrix": str(CONFUSION_PLOT_PATH)},
+        "plots": {"roc_curves": str(ROC_PLOT_PATH), "confusion_matrices": str(CONFUSION_PLOT_PATH)},
         "demo_cases": str(DEMO_PATH),
         "training_data": str(TRAINING_DATA_PATH),
         "testing_data": str(TESTING_DATA_PATH),
+        "demo_cases": str(DEMO_PATH),
         "library_versions": {
             "python": platform.python_version(),
             "scikit_learn": sklearn.__version__,
@@ -422,40 +439,26 @@ def train_and_save(verbose: bool = False) -> dict:
     EVIDENCE_PATH.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     QUALITY_PATH.write_text(json.dumps(data_quality, indent=2) + "\n", encoding="utf-8")
 
-    # When the server retrains, stop here. The printout below is only for running the script by hand.
-    if not verbose:
-        return model_bundle
-
     cv_frame = pd.DataFrame(cv_records)
     print("\nFull cross-validation results (all grid combinations):")
     print(cv_frame.to_string(index=False))
-    print(f"\nBest CV metrics and parameters for {MODEL_NAME}:")
-    print(pd.Series(best_cv).to_string())
+    print("\nBest CV metrics and parameters by model:")
+    print(pd.DataFrame(best_cv).T.to_string())
     print("\nTest-set results (malignant positive):")
-    print(pd.Series({key: value for key, value in test_json.items() if not key.startswith("confusion")}).to_string())
-    print("\nConfusion matrix (actual/predicted; malignant, benign):")
-    print(np.asarray(test_json["confusion_matrix"]))
+    print(pd.DataFrame(test_json).T.to_string())
+    for model_name, results in test_json.items():
+        print(f"\n{model_name} confusion matrix (actual/predicted; malignant, benign):")
+        print(np.asarray(results["confusion_matrix"]))
+    print(f"\nSelected model: {selected_name}")
+    print(f"Selection decision: {selection}")
     print(f"Model bundle: {MODEL_PATH}")
     print(f"Evidence JSON: {EVIDENCE_PATH}")
     print(f"Dataset quality report: {QUALITY_PATH}")
-    print(f"ROC curve: {ROC_PLOT_PATH}")
-    print(f"Confusion matrix: {CONFUSION_PLOT_PATH}")
+    print(f"ROC curves: {ROC_PLOT_PATH}")
+    print(f"Confusion matrices: {CONFUSION_PLOT_PATH}")
     print(f"Demo cases from held-out test rows: {DEMO_PATH}")
-    print(f"Model version: {model_version}")
     print("WARNING: This educational model is not clinically validated.")
-    return model_bundle
-
-
-def main() -> None:
-    """Set up the database (first run only), export the original split as JSON, and train a model."""
-    database.init_db()
-    if database.seed_wdbc_records():
-        print(f"Seeded {database.DATABASE_PATH} with the WDBC training and test split.")
-    with database.connect() as connection:
-        write_dataset_files(connection)
-    train_and_save(verbose=True)
 
 
 if __name__ == "__main__":
     main()
-    

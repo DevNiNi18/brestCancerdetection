@@ -1,8 +1,5 @@
 {
   "dataset": "scikit-learn load_breast_cancer (Wisconsin Diagnostic Breast Cancer)",
-  "model": "Logistic Regression",
-  "model_version": 1,
-  "database": "data/breast_cancer.db",
   "data_quality": {
     "source": "scikit-learn bundled load_breast_cancer dataset (Wisconsin Diagnostic Breast Cancer)",
     "rows": 569,
@@ -297,7 +294,6 @@
   },
   "observations": 569,
   "training_observations": 455,
-  "training_observations_from_reviews": 0,
   "test_observations": 114,
   "positive_class": "malignant",
   "split": {
@@ -309,10 +305,11 @@
     "folds": 5,
     "shuffle": true,
     "random_state": 42,
-    "refit_metric": "ROC-AUC (malignant positive)"
+    "selection_refit_metric": "ROC-AUC (malignant positive)"
   },
   "all_cv_parameter_combinations": [
     {
+      "model": "Logistic Regression",
       "parameters": {
         "classifier__C": 0.01
       },
@@ -329,6 +326,7 @@
       "rank_roc_auc": 3
     },
     {
+      "model": "Logistic Regression",
       "parameters": {
         "classifier__C": 0.1
       },
@@ -345,6 +343,7 @@
       "rank_roc_auc": 2
     },
     {
+      "model": "Logistic Regression",
       "parameters": {
         "classifier__C": 1
       },
@@ -361,6 +360,7 @@
       "rank_roc_auc": 1
     },
     {
+      "model": "Logistic Regression",
       "parameters": {
         "classifier__C": 10
       },
@@ -377,6 +377,7 @@
       "rank_roc_auc": 4
     },
     {
+      "model": "Logistic Regression",
       "parameters": {
         "classifier__C": 100
       },
@@ -391,48 +392,938 @@
       "mean_accuracy": 0.9538461538461538,
       "std_accuracy": 0.016150481820548422,
       "rank_roc_auc": 5
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9956656346749225,
+      "std_roc_auc": 0.004622125010641662,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9882352941176471,
+      "std_precision": 0.014408763192842226,
+      "mean_f1": 0.9666896134301753,
+      "std_f1": 0.015681102944741454,
+      "mean_accuracy": 0.9758241758241759,
+      "std_accuracy": 0.010766987880365607,
+      "rank_roc_auc": 3
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9881320949432405,
+      "std_roc_auc": 0.006285837908293488,
+      "mean_recall": 0.8823529411764705,
+      "std_recall": 0.04159451654038516,
+      "mean_precision": 0.9621855165870576,
+      "std_precision": 0.022971660283566613,
+      "mean_f1": 0.9198533982357512,
+      "std_f1": 0.02393940463460665,
+      "mean_accuracy": 0.9428571428571428,
+      "std_accuracy": 0.016150481820548422,
+      "rank_roc_auc": 20
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9956656346749225,
+      "std_roc_auc": 0.004622125010641662,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9882352941176471,
+      "std_precision": 0.014408763192842226,
+      "mean_f1": 0.9666896134301753,
+      "std_f1": 0.015681102944741454,
+      "mean_accuracy": 0.9758241758241759,
+      "std_accuracy": 0.010766987880365607,
+      "rank_roc_auc": 3
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9888544891640866,
+      "std_roc_auc": 0.006644937061715301,
+      "mean_recall": 0.8705882352941176,
+      "std_recall": 0.029994232432898744,
+      "mean_precision": 0.9868817204301076,
+      "std_precision": 0.016070143391199478,
+      "mean_f1": 0.9247797766749379,
+      "std_f1": 0.019065593773529146,
+      "mean_accuracy": 0.9472527472527472,
+      "std_accuracy": 0.012815278889769894,
+      "rank_roc_auc": 19
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9956656346749225,
+      "std_roc_auc": 0.004622125010641662,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9882352941176471,
+      "std_precision": 0.014408763192842226,
+      "mean_f1": 0.9666896134301753,
+      "std_f1": 0.015681102944741454,
+      "mean_accuracy": 0.9758241758241759,
+      "std_accuracy": 0.010766987880365607,
+      "rank_roc_auc": 3
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 0.1,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9854489164086686,
+      "std_roc_auc": 0.007365558670817548,
+      "mean_recall": 0.28823529411764703,
+      "std_recall": 0.05060191333554488,
+      "mean_precision": 1.0,
+      "std_precision": 0.0,
+      "mean_f1": 0.4450483079332126,
+      "std_f1": 0.06216553979729244,
+      "mean_accuracy": 0.7340659340659341,
+      "std_accuracy": 0.018906209378115643,
+      "rank_roc_auc": 21
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9947368421052631,
+      "std_roc_auc": 0.007292903919114414,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03901911518065177,
+      "mean_precision": 0.9588997113997115,
+      "std_precision": 0.023366989134018565,
+      "mean_f1": 0.95239241398878,
+      "std_f1": 0.022635864436905257,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.01615048182054841,
+      "rank_roc_auc": 7
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9955624355005162,
+      "std_roc_auc": 0.004758366102538075,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.03989605872426629,
+      "mean_precision": 0.9649480984964857,
+      "std_precision": 0.020820198137136637,
+      "mean_f1": 0.9582651482197232,
+      "std_f1": 0.020700356656583197,
+      "mean_accuracy": 0.9692307692307693,
+      "std_accuracy": 0.014578570507056717,
+      "rank_roc_auc": 6
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9947368421052631,
+      "std_roc_auc": 0.007292903919114414,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03901911518065177,
+      "mean_precision": 0.9588997113997115,
+      "std_precision": 0.023366989134018565,
+      "mean_f1": 0.95239241398878,
+      "std_f1": 0.022635864436905257,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.01615048182054841,
+      "rank_roc_auc": 7
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9945304437564498,
+      "std_roc_auc": 0.0043368217522086324,
+      "mean_recall": 0.9352941176470587,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9876893939393939,
+      "std_precision": 0.015080325179844223,
+      "mean_f1": 0.9604534147444594,
+      "std_f1": 0.021024352311094223,
+      "mean_accuracy": 0.9714285714285715,
+      "std_accuracy": 0.014906219743132458,
+      "rank_roc_auc": 10
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9947368421052631,
+      "std_roc_auc": 0.007292903919114414,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.03901911518065177,
+      "mean_precision": 0.9588997113997115,
+      "std_precision": 0.023366989134018565,
+      "mean_f1": 0.95239241398878,
+      "std_f1": 0.022635864436905257,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.01615048182054841,
+      "rank_roc_auc": 7
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 1,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9911248710010321,
+      "std_roc_auc": 0.00510183987381149,
+      "mean_recall": 0.8529411764705882,
+      "std_recall": 0.05261336417646566,
+      "mean_precision": 1.0,
+      "std_precision": 0.0,
+      "mean_f1": 0.9197477253928866,
+      "std_f1": 0.03125239808857471,
+      "mean_accuracy": 0.945054945054945,
+      "std_accuracy": 0.01965774046153663,
+      "rank_roc_auc": 14
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9904024767801858,
+      "std_roc_auc": 0.009917864831152881,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.03989605872426629,
+      "mean_precision": 0.9534063322298616,
+      "std_precision": 0.030021520989255982,
+      "mean_f1": 0.9527541255426127,
+      "std_f1": 0.028769473493708706,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.021308482889742106,
+      "rank_roc_auc": 15
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9925696594427246,
+      "std_roc_auc": 0.008050858561338312,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.02352941176470589,
+      "mean_precision": 0.9656547619047618,
+      "std_precision": 0.0325217962843397,
+      "mean_f1": 0.9587088835888317,
+      "std_f1": 0.017000110642101517,
+      "mean_accuracy": 0.9692307692307693,
+      "std_accuracy": 0.01281527888976988,
+      "rank_roc_auc": 13
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9904024767801858,
+      "std_roc_auc": 0.009917864831152881,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.03989605872426629,
+      "mean_precision": 0.9534063322298616,
+      "std_precision": 0.030021520989255982,
+      "mean_f1": 0.9527541255426127,
+      "std_f1": 0.028769473493708706,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.021308482889742106,
+      "rank_roc_auc": 15
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9963880288957689,
+      "std_roc_auc": 0.004949258537990361,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.03989605872426629,
+      "mean_precision": 0.9819517484413121,
+      "std_precision": 0.014786914745306114,
+      "mean_f1": 0.9667888002620988,
+      "std_f1": 0.022883937784400964,
+      "mean_accuracy": 0.9758241758241759,
+      "std_accuracy": 0.016150481820548446,
+      "rank_roc_auc": 1
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9904024767801858,
+      "std_roc_auc": 0.009917864831152881,
+      "mean_recall": 0.9529411764705882,
+      "std_recall": 0.03989605872426629,
+      "mean_precision": 0.9534063322298616,
+      "std_precision": 0.030021520989255982,
+      "mean_f1": 0.9527541255426127,
+      "std_f1": 0.028769473493708706,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.021308482889742106,
+      "rank_roc_auc": 15
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9941176470588236,
+      "std_roc_auc": 0.005186721103458867,
+      "mean_recall": 0.9294117647058824,
+      "std_recall": 0.05455069703232768,
+      "mean_precision": 0.9939393939393939,
+      "std_precision": 0.01212121212121211,
+      "mean_f1": 0.9596591820953881,
+      "std_f1": 0.030321756649673324,
+      "mean_accuracy": 0.9714285714285715,
+      "std_accuracy": 0.020381579110979577,
+      "rank_roc_auc": 11
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9842105263157895,
+      "std_roc_auc": 0.01166013672692919,
+      "mean_recall": 0.9411764705882353,
+      "std_recall": 0.05261336417646565,
+      "mean_precision": 0.9112871048354918,
+      "std_precision": 0.03259304316450058,
+      "mean_f1": 0.9244276707221293,
+      "std_f1": 0.020496130910565662,
+      "mean_accuracy": 0.9428571428571428,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 22
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": "scale",
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9895768833849328,
+      "std_roc_auc": 0.0110688030363607,
+      "mean_recall": 0.9647058823529411,
+      "std_recall": 0.028817526385684453,
+      "mean_precision": 0.9492063492063492,
+      "std_precision": 0.04104947269903395,
+      "mean_f1": 0.956506681724073,
+      "std_f1": 0.029926397218933882,
+      "mean_accuracy": 0.9670329670329672,
+      "std_accuracy": 0.02305074391582752,
+      "rank_roc_auc": 18
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9842105263157895,
+      "std_roc_auc": 0.01166013672692919,
+      "mean_recall": 0.9411764705882353,
+      "std_recall": 0.05261336417646565,
+      "mean_precision": 0.9112871048354918,
+      "std_precision": 0.03259304316450058,
+      "mean_f1": 0.9244276707221293,
+      "std_f1": 0.020496130910565662,
+      "mean_accuracy": 0.9428571428571428,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 22
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9926728586171312,
+      "std_roc_auc": 0.0066992084074788,
+      "mean_recall": 0.9470588235294117,
+      "std_recall": 0.028817526385684456,
+      "mean_precision": 0.9603636724960255,
+      "std_precision": 0.03616306694662695,
+      "mean_f1": 0.9527988057234122,
+      "std_f1": 0.016449593691687695,
+      "mean_accuracy": 0.9648351648351647,
+      "std_accuracy": 0.01281527888976988,
+      "rank_roc_auc": 12
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "linear"
+      },
+      "mean_roc_auc": 0.9842105263157895,
+      "std_roc_auc": 0.01166013672692919,
+      "mean_recall": 0.9411764705882353,
+      "std_recall": 0.05261336417646565,
+      "mean_precision": 0.9112871048354918,
+      "std_precision": 0.03259304316450058,
+      "mean_f1": 0.9244276707221293,
+      "std_f1": 0.020496130910565662,
+      "mean_accuracy": 0.9428571428571428,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 22
+    },
+    {
+      "model": "SVM",
+      "parameters": {
+        "classifier__C": 100,
+        "classifier__gamma": 0.001,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9958720330237358,
+      "std_roc_auc": 0.005460787019741147,
+      "mean_recall": 0.9352941176470587,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9880570409982175,
+      "std_precision": 0.01462979289032669,
+      "mean_f1": 0.9604465793205916,
+      "std_f1": 0.016166518565758896,
+      "mean_accuracy": 0.9714285714285715,
+      "std_accuracy": 0.011206636293610512,
+      "rank_roc_auc": 2
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 2,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.989576883384933,
+      "std_roc_auc": 0.00825690138810606,
+      "mean_recall": 0.9588235294117646,
+      "std_recall": 0.029994232432898744,
+      "mean_precision": 0.943968253968254,
+      "std_precision": 0.03917645541143537,
+      "mean_f1": 0.9506035992992515,
+      "std_f1": 0.02299043052068381,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 11
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 2,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9894736842105264,
+      "std_roc_auc": 0.008625623815878976,
+      "mean_recall": 0.9529411764705881,
+      "std_recall": 0.029994232432898744,
+      "mean_precision": 0.9493362193362194,
+      "std_precision": 0.04047376996824085,
+      "mean_f1": 0.9503440275925674,
+      "std_f1": 0.02292939253659555,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 13
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 2,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9904024767801858,
+      "std_roc_auc": 0.0071710432333749125,
+      "mean_recall": 0.9588235294117646,
+      "std_recall": 0.03529411764705884,
+      "mean_precision": 0.9497866697866698,
+      "std_precision": 0.04011864464863298,
+      "mean_f1": 0.9533218947957869,
+      "std_f1": 0.02272967041999315,
+      "mean_accuracy": 0.964835164835165,
+      "std_accuracy": 0.01758241758241759,
+      "rank_roc_auc": 3
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 5,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.9883384932920537,
+      "std_roc_auc": 0.00910612112216961,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9483456412868178,
+      "std_precision": 0.03690059010298835,
+      "mean_f1": 0.9441229953769558,
+      "std_f1": 0.020930829956855447,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.016150481820548422,
+      "rank_roc_auc": 17
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 5,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9886480908152734,
+      "std_roc_auc": 0.00930510966262113,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9483456412868178,
+      "std_precision": 0.03690059010298835,
+      "mean_f1": 0.9441229953769558,
+      "std_f1": 0.020930829956855447,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.016150481820548422,
+      "rank_roc_auc": 15
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": null,
+        "min_samples_split": 5,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9902992776057792,
+      "std_roc_auc": 0.007437503713819339,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9489787581699346,
+      "std_precision": 0.040288713731004774,
+      "mean_f1": 0.9441942371354136,
+      "std_f1": 0.018488661679848622,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 5
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.9902992776057792,
+      "std_roc_auc": 0.007182543917979523,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.04159451654038516,
+      "mean_precision": 0.9543849206349206,
+      "std_precision": 0.03741709993570978,
+      "mean_f1": 0.94664172783738,
+      "std_f1": 0.02362691851519775,
+      "mean_accuracy": 0.9604395604395606,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 5
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9897832817337461,
+      "std_roc_auc": 0.008148161380042075,
+      "mean_recall": 0.9352941176470587,
+      "std_recall": 0.03429971702850177,
+      "mean_precision": 0.9487771452667089,
+      "std_precision": 0.04019167538456643,
+      "mean_f1": 0.9409308338720104,
+      "std_f1": 0.020390204235856378,
+      "mean_accuracy": 0.956043956043956,
+      "std_accuracy": 0.015540808377726312,
+      "rank_roc_auc": 9
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9909184726522188,
+      "std_roc_auc": 0.0065805154043054054,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9489787581699346,
+      "std_precision": 0.040288713731004774,
+      "mean_f1": 0.9441942371354136,
+      "std_f1": 0.018488661679848622,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 1
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 5,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.9899896800825593,
+      "std_roc_auc": 0.007019061330498231,
+      "mean_recall": 0.9470588235294116,
+      "std_recall": 0.03429971702850178,
+      "mean_precision": 0.9481349206349206,
+      "std_precision": 0.03140224316088583,
+      "mean_f1": 0.947020515716168,
+      "std_f1": 0.023492118852081138,
+      "mean_accuracy": 0.9604395604395606,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 8
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 5,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9897832817337461,
+      "std_roc_auc": 0.007759864271251759,
+      "mean_recall": 0.9470588235294116,
+      "std_recall": 0.03429971702850178,
+      "mean_precision": 0.9543849206349206,
+      "std_precision": 0.03741709993570978,
+      "mean_f1": 0.9499109586066108,
+      "std_f1": 0.02326391888642029,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 9
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 5,
+        "min_samples_split": 5,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9907120743034057,
+      "std_roc_auc": 0.006403340374608265,
+      "mean_recall": 0.9470588235294116,
+      "std_recall": 0.03429971702850178,
+      "mean_precision": 0.9543849206349206,
+      "std_precision": 0.03741709993570978,
+      "mean_f1": 0.9499109586066108,
+      "std_f1": 0.02326391888642029,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 2
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 2,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.989576883384933,
+      "std_roc_auc": 0.00825690138810606,
+      "mean_recall": 0.9588235294117646,
+      "std_recall": 0.029994232432898744,
+      "mean_precision": 0.943968253968254,
+      "std_precision": 0.03917645541143537,
+      "mean_f1": 0.9506035992992515,
+      "std_f1": 0.02299043052068381,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 11
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 2,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9894736842105264,
+      "std_roc_auc": 0.008625623815878976,
+      "mean_recall": 0.9529411764705881,
+      "std_recall": 0.029994232432898744,
+      "mean_precision": 0.9493362193362194,
+      "std_precision": 0.04047376996824085,
+      "mean_f1": 0.9503440275925674,
+      "std_f1": 0.02292939253659555,
+      "mean_accuracy": 0.9626373626373628,
+      "std_accuracy": 0.01785502946073838,
+      "rank_roc_auc": 13
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 2,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9903508771929825,
+      "std_roc_auc": 0.007199205768670873,
+      "mean_recall": 0.9588235294117646,
+      "std_recall": 0.03529411764705884,
+      "mean_precision": 0.9497866697866698,
+      "std_precision": 0.04011864464863298,
+      "mean_f1": 0.9533218947957869,
+      "std_f1": 0.02272967041999315,
+      "mean_accuracy": 0.964835164835165,
+      "std_accuracy": 0.01758241758241759,
+      "rank_roc_auc": 4
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 5,
+        "n_estimators": 100
+      },
+      "mean_roc_auc": 0.9883384932920537,
+      "std_roc_auc": 0.00910612112216961,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9483456412868178,
+      "std_precision": 0.03690059010298835,
+      "mean_f1": 0.9441229953769558,
+      "std_f1": 0.020930829956855447,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.016150481820548422,
+      "rank_roc_auc": 17
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 5,
+        "n_estimators": 200
+      },
+      "mean_roc_auc": 0.9886480908152734,
+      "std_roc_auc": 0.00930510966262113,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9483456412868178,
+      "std_precision": 0.03690059010298835,
+      "mean_f1": 0.9441229953769558,
+      "std_f1": 0.020930829956855447,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.016150481820548422,
+      "rank_roc_auc": 15
+    },
+    {
+      "model": "Random Forest",
+      "parameters": {
+        "max_depth": 10,
+        "min_samples_split": 5,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9902992776057792,
+      "std_roc_auc": 0.007437503713819339,
+      "mean_recall": 0.9411764705882352,
+      "std_recall": 0.02630668208823283,
+      "mean_precision": 0.9489787581699346,
+      "std_precision": 0.040288713731004774,
+      "mean_f1": 0.9441942371354136,
+      "std_f1": 0.018488661679848622,
+      "mean_accuracy": 0.9582417582417582,
+      "std_accuracy": 0.014578570507056687,
+      "rank_roc_auc": 5
     }
   ],
-  "best_cv_results": {
-    "best_parameters": {
+  "best_cv_results_by_model": {
+    "Logistic Regression": {
+      "best_parameters": {
+        "classifier__C": 1
+      },
+      "mean_roc_auc": 0.9958720330237358,
+      "mean_recall": 0.9647058823529411,
+      "mean_precision": 0.9769747899159664,
+      "mean_f1": 0.9703076003026379,
+      "mean_accuracy": 0.9780219780219781
+    },
+    "SVM": {
+      "best_parameters": {
+        "classifier__C": 10,
+        "classifier__gamma": 0.01,
+        "classifier__kernel": "rbf"
+      },
+      "mean_roc_auc": 0.9963880288957689,
+      "mean_recall": 0.9529411764705882,
+      "mean_precision": 0.9819517484413121,
+      "mean_f1": 0.9667888002620988,
+      "mean_accuracy": 0.9758241758241759
+    },
+    "Random Forest": {
+      "best_parameters": {
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "n_estimators": 300
+      },
+      "mean_roc_auc": 0.9909184726522188,
+      "mean_recall": 0.9411764705882352,
+      "mean_precision": 0.9489787581699346,
+      "mean_f1": 0.9441942371354136,
+      "mean_accuracy": 0.9582417582417582
+    }
+  },
+  "selection_decision": {
+    "rule": "Among models with mean CV ROC-AUC within 0.01 of the highest, maximize mean CV malignant recall; break ties by F1, then Logistic Regression, SVM, Random Forest.",
+    "best_mean_cv_roc_auc": 0.9963880288957689,
+    "eligibility_threshold": 0.9863880288957689,
+    "eligible_models": [
+      "Logistic Regression",
+      "SVM",
+      "Random Forest"
+    ],
+    "selected_model": "Logistic Regression",
+    "selected_best_parameters": {
       "classifier__C": 1
     },
-    "mean_roc_auc": 0.9958720330237358,
-    "mean_recall": 0.9647058823529411,
-    "mean_precision": 0.9769747899159664,
-    "mean_f1": 0.9703076003026379,
-    "mean_accuracy": 0.9780219780219781
+    "selected_cv_metrics": {
+      "best_parameters": {
+        "classifier__C": 1
+      },
+      "mean_roc_auc": 0.9958720330237358,
+      "mean_recall": 0.9647058823529411,
+      "mean_precision": 0.9769747899159664,
+      "mean_f1": 0.9703076003026379,
+      "mean_accuracy": 0.9780219780219781
+    }
   },
   "test_results": {
-    "accuracy": 0.9824561403508771,
-    "precision": 0.9761904761904762,
-    "recall": 0.9761904761904762,
-    "f1": 0.9761904761904762,
-    "roc_auc": 0.9953703703703705,
-    "confusion_matrix_labels": [
-      "malignant",
-      "benign"
-    ],
-    "confusion_matrix": [
-      [
-        41,
-        1
+    "Logistic Regression": {
+      "accuracy": 0.9824561403508771,
+      "precision": 0.9761904761904762,
+      "recall": 0.9761904761904762,
+      "f1": 0.9761904761904762,
+      "roc_auc": 0.9953703703703705,
+      "confusion_matrix_labels": [
+        "malignant",
+        "benign"
       ],
-      [
-        1,
-        71
+      "confusion_matrix": [
+        [
+          41,
+          1
+        ],
+        [
+          1,
+          71
+        ]
       ]
-    ]
+    },
+    "SVM": {
+      "accuracy": 0.9824561403508771,
+      "precision": 0.9761904761904762,
+      "recall": 0.9761904761904762,
+      "f1": 0.9761904761904762,
+      "roc_auc": 0.9976851851851852,
+      "confusion_matrix_labels": [
+        "malignant",
+        "benign"
+      ],
+      "confusion_matrix": [
+        [
+          41,
+          1
+        ],
+        [
+          1,
+          71
+        ]
+      ]
+    },
+    "Random Forest": {
+      "accuracy": 0.956140350877193,
+      "precision": 0.9512195121951219,
+      "recall": 0.9285714285714286,
+      "f1": 0.9397590361445783,
+      "roc_auc": 0.9927248677248678,
+      "confusion_matrix_labels": [
+        "malignant",
+        "benign"
+      ],
+      "confusion_matrix": [
+        [
+          39,
+          3
+        ],
+        [
+          2,
+          70
+        ]
+      ]
+    }
   },
   "saved_model": "models/breast_cancer_model.joblib",
   "data_quality_report": "models/data_quality_report.json",
   "plots": {
-    "roc_curve": "models/roc_curve.png",
-    "confusion_matrix": "models/confusion_matrix.png"
+    "roc_curves": "models/roc_curves.png",
+    "confusion_matrices": "models/confusion_matrices.png"
   },
   "demo_cases": "demo_cases.json",
-  "training_data": "training_data.json",
-  "testing_data": "testing_data.json",
   "library_versions": {
     "python": "3.9.6",
     "scikit_learn": "1.6.1",
@@ -442,5 +1333,7 @@
     "joblib": "1.5.3",
     "matplotlib": "3.9.4"
   },
-  "warning": "Educational prototype results on a small public dataset do not establish clinical performance."
+  "warning": "Educational prototype results on a small public dataset do not establish clinical performance.",
+  "training_data": "training_data.json",
+  "testing_data": "testing_data.json"
 }

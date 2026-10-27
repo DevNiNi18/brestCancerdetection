@@ -18,12 +18,12 @@ git clone https://github.com/OtieteAyebanua/brestCancerdetection.git
 cd brestCancerdetection
 ```
 
-The project was run with Python 3.9.6. Install that version, then from the project folder create an environment and install the required packages.
+Use Python 3.11, 3.12, 3.13 or 3.14 (3.12 recommended). Install it, then from the project folder create an environment and install the required packages.
 
 macOS/Linux:
 
 ```bash
-python3.9 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
@@ -33,7 +33,7 @@ streamlit run app.py --server.port 3001
 Windows PowerShell:
 
 ```powershell
-py -3.9 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
@@ -115,7 +115,7 @@ The training and test JSON records include a `source_index`, a `features` object
 | [`app.py`](app.py) | Runs the Streamlit interface, validates inputs, loads the saved model, and displays predictions. It also loads the held-out examples from `demo_cases.json`. |
 | [`train_model.py`](train_model.py) | Splits the data, tunes and compares the three classifiers, evaluates them, and writes model, data, and report files. |
 | [`requirements.txt`](requirements.txt) | Lists the Python packages needed by the project. |
-| [`.python-version`](.python-version) | Selects Python 3.9.6 for tools that recognize this file. |
+| [`.python-version`](.python-version) | Selects Python 3.12 for tools that recognize this file. |
 | [`run`](run) | Convenience launcher for macOS/Linux after Python and dependencies are set up. |
 | [`project_workflow.png`](project_workflow.png) and [`project_workflow.svg`](project_workflow.svg) | Workflow diagram embedded in this guide and its scalable vector version. |
 | [`models/breast_cancer_model.joblib`](models/breast_cancer_model.joblib) | The selected model loaded by the app. |

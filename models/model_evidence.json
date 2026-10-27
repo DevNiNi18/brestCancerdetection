@@ -1324,16 +1324,16 @@
     "confusion_matrices": "models/confusion_matrices.png"
   },
   "demo_cases": "demo_cases.json",
-  "library_versions": {
-    "python": "3.9.6",
-    "scikit_learn": "1.6.1",
-    "streamlit": "1.50.0",
-    "numpy": "2.0.2",
-    "pandas": "2.3.3",
-    "joblib": "1.5.3",
-    "matplotlib": "3.9.4"
-  },
-  "warning": "Educational prototype results on a small public dataset do not establish clinical performance.",
   "training_data": "training_data.json",
-  "testing_data": "testing_data.json"
+  "testing_data": "testing_data.json",
+  "library_versions": {
+    "python": "3.14.10",
+    "scikit_learn": "1.9.1",
+    "streamlit": "1.66.1",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "joblib": "1.6.0",
+    "matplotlib": "3.11.2"
+  },
+  "warning": "Educational prototype results on a small public dataset do not establish clinical performance."
 }

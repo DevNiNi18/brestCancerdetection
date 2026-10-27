@@ -92,9 +92,8 @@ def load_demo_input() -> None:
         "number": case_index + 1,
         "true_label": case["true_label"],
     }
+    # The fields read their values from measurement_values when they are drawn.
     st.session_state["measurement_values"] = values
-    for input_key, value in values.items():
-        st.session_state[f"field_{input_key}"] = value
 
 
 def load_demo_cases(path: Path) -> list:
@@ -299,21 +298,23 @@ with st.container(border=True):
                     f'<div class="field-label"><span>{feature_label}</span><small>{unit}</small></div>',
                     unsafe_allow_html=True,
                 )
+                input_key = f"{active_group}_{feature_key}"
+                widget_key = f"field_{input_key}"
+                # Streamlit forgets a field's value while its tab is hidden, so fill the field from
+                # measurement_values every time it is drawn. value=None leaves an unfilled field
+                # empty instead of showing 0.
+                st.session_state[widget_key] = measurement_values.get(input_key)
                 st.number_input(
                     f"{feature_label} ({unit})",
                     min_value=0.0,
+                    value=None,
                     step=0.01,
                     format="%.5g",
-                key=f"field_{active_group}_{feature_key}",
-                on_change=persist_measurement,
-                args=(f"{active_group}_{feature_key}", f"field_{active_group}_{feature_key}"),
+                    key=widget_key,
+                    on_change=persist_measurement,
+                    args=(input_key, widget_key),
                     help=FEATURE_HELP[feature_key],
                     label_visibility="collapsed",
-                **(
-                    {"value": measurement_values.get(f"{active_group}_{feature_key}")}
-                    if f"field_{active_group}_{feature_key}" not in st.session_state
-                    else {}
-                ),
                 )
 
     st.markdown('<hr class="card-divider">', unsafe_allow_html=True)
